@@ -367,4 +367,6 @@ def dtype_to_petsctype(dtype):
     return {
         np.int32: 'PetscInt',
         np.float32: 'PetscScalar',
+        np.int64: 'PetscInt',
+        np.float64: 'PetscScalar'
     }[dtype]
