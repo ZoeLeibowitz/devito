@@ -35,6 +35,8 @@ from devito.tools import (DAG, OrderedSet, Signer, ReducerMap, as_mapper, as_tup
 from devito.types import (Buffer, Evaluable, host_layer, device_layer,
                           disk_layer)
 from devito.types.dimension import Thickness
+from devito.petsc.iet.passes import lower_petsc
+from devito.petsc.clusters import petsc_preprocess
 
 
 __all__ = ['Operator']
@@ -429,6 +431,7 @@ class Operator(Callable):
             * Derive sections for performance profiling
         """
         # Build a ScheduleTree from a sequence of Clusters
+        # from IPython import embed; embed()
         stree = stree_build(clusters, **kwargs)
 
         stree = cls._specialize_stree(stree)
