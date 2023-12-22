@@ -21,7 +21,7 @@ from devito.tools import (Signer, as_tuple, filter_ordered, filter_sorted, flatt
                           ctypes_to_cstr)
 from devito.types.basic import (AbstractFunction, AbstractSymbol, Basic, Indexed,
                                 Symbol)
-from devito.types.object import AbstractObject, LocalObject
+from devito.types.object import AbstractObject, LocalObject, LocalCompositeObject
 
 __all__ = ['Node', 'MultiTraversable', 'Block', 'Expression', 'Callable',
            'Call', 'ExprStmt', 'Conditional', 'Iteration', 'List', 'Section',
@@ -1046,15 +1046,10 @@ class Dereference(ExprStmt, Node):
     The following cases are supported:
 
         * `pointer` is a PointerArray or TempFunction, and `pointee` is an Array.
-<<<<<<< HEAD
-        * `pointer` is an ArrayObject representing a pointer to a C struct, and
-          `pointee` is a field in `pointer`.
-        * `pointer` is a Symbol with its _C_ctype deriving from ct._Pointer, and
-          `pointee` is a Symbol representing the dereferenced value.
-=======
         * `pointer` is an ArrayObject or CCompositeObject representing a pointer
            to a C struct, and `pointee` is a field in `pointer`.
->>>>>>> 1fe94ea29 (compiler: Create mixin for ThreadCallable and PETScCallable)
+        * `pointer` is a Symbol with its _C_ctype deriving from ct._Pointer, and
+          `pointee` is a Symbol representing the dereferenced value.
     """
 
     is_Dereference = True
@@ -1075,7 +1070,8 @@ class Dereference(ExprStmt, Node):
     def expr_symbols(self):
         ret = []
         if self.pointer.is_Symbol:
-            assert issubclass(self.pointer._C_ctype, ctypes._Pointer), \
+            assert (isinstance(self.pointer, LocalCompositeObject) or
+                    issubclass(self.pointer._C_ctype, ctypes._Pointer)), \
                    "Scalar dereference must have a pointer ctype"
             ret.extend([self.pointer._C_symbol, self.pointee._C_symbol])
         elif self.pointer.is_PointerArray or self.pointer.is_TempFunction:
