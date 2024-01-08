@@ -359,14 +359,3 @@ def infer_dtype(dtypes):
     else:
         # E.g., mixed integer arithmetic
         return max(dtypes, key=lambda i: np.dtype(i).itemsize, default=None)
-
-
-def dtype_to_petsctype(dtype):
-    """Map numpy types to PETSc datatypes."""
-
-    return {
-        np.int32: 'PetscInt',
-        np.float32: 'PetscScalar',
-        np.int64: 'PetscInt',
-        np.float64: 'PetscScalar'
-    }[dtype]
