@@ -21,7 +21,8 @@ from devito.operator.registry import operator_selector
 from devito.mpi import MPI
 from devito.parameters import configuration
 from devito.passes import (Graph, lower_index_derivatives, generate_implicit,
-                           generate_macros, minimize_symbols, unevaluate)
+                           generate_macros, minimize_symbols, unevaluate,
+                           lower_petsc)
 from devito.symbolics import estimate_cost
 from devito.tools import (DAG, OrderedSet, Signer, ReducerMap, as_tuple, flatten,
                           filter_sorted, frozendict, is_integer, split, timed_pass,
@@ -459,11 +460,14 @@ class Operator(Callable):
 
         # Lower IET to a target-specific IET
         graph = Graph(iet, **kwargs)
-        graph = cls._specialize_iet(graph, **kwargs)
 
+        lower_petsc(graph, **kwargs)
+
+        graph = cls._specialize_iet(graph, **kwargs)
         # Instrument the IET for C-level profiling
         # Note: this is postponed until after _specialize_iet because during
         # specialization further Sections may be introduced
+        # TODO: Figure out how to work the timers around PETSc.
         cls._Target.instrument(graph, profiler=profiler, **kwargs)
 
         # Extract the necessary macros from the symbolic objects

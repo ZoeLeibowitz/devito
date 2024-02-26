@@ -1,9 +1,12 @@
-from devito import Grid
+from devito import Eq, Grid, Operator, TimeFunction, Function
 from devito.ir.iet import Call, ElementalFunction, Definition, DummyExpr
 from devito.passes.iet.languages.C import CDataManager
-from devito.types import (DM, Mat, Vec, PetscMPIInt, KSP,
-                          PC, KSPConvergedReason, PETScArray)
+from devito.types.petsc import (DM, Mat, Vec, PetscMPIInt, KSP,
+                                PC, KSPConvergedReason, PETScArray,
+                                PETScSolve)
 import numpy as np
+import os
+from devito.types.petsc import PETScStruct
 
 
 def test_petsc_local_object():
@@ -57,9 +60,42 @@ def test_petsc_functions():
 
     expr = DummyExpr(ptr0.indexed[x, y], ptr1.indexed[x, y] + 1)
 
-    assert str(defn0) == 'PetscScalar**restrict ptr0;'
-    assert str(defn1) == 'const PetscScalar**restrict ptr1;'
-    assert str(defn2) == 'const PetscScalar**restrict ptr2;'
-    assert str(defn3) == 'PetscInt**restrict ptr3;'
-    assert str(defn4) == 'const PetscInt**restrict ptr4;'
+    assert str(defn0) == 'PetscScalar** ptr0;'
+    assert str(defn1) == 'const PetscScalar** ptr1;'
+    assert str(defn2) == 'const PetscScalar** ptr2;'
+    assert str(defn3) == 'PetscInt** ptr3;'
+    assert str(defn4) == 'const PetscInt** ptr4;'
     assert str(expr) == 'ptr0[x][y] = ptr1[x][y] + 1;'
+
+
+def test_cinterface_petsc_struct():
+
+    grid = Grid(shape=(11, 11), extent=(1., 1.))
+
+    f = TimeFunction(name='f', grid=grid, space_order=2)
+    g = TimeFunction(name='g', grid=grid, space_order=2)
+    h = Function(name='h', grid=grid, space_order=2)
+
+    eq = Eq(h.laplace, f.dxc+g.dyc)
+
+    petsc = PETScSolve(eq, h)
+
+    name = "foo"
+    op = Operator(petsc, name=name)
+
+    # Trigger the generation of a .c and a .h files
+    ccode, hcode = op.cinterface(force=True)
+
+    dirname = op._compiler.get_jit_dir()
+    assert os.path.isfile(os.path.join(dirname, "%s.c" % name))
+    assert os.path.isfile(os.path.join(dirname, "%s.h" % name))
+
+    ccode = str(ccode)
+    hcode = str(hcode)
+
+    assert 'include "%s.h"' % name in ccode
+
+    # The public `struct MatContext` only appears in the header file
+    assert any(isinstance(i, PETScStruct) for i in op.parameters)
+    assert 'struct MatContext\n{' not in ccode
+    assert 'struct MatContext\n{' in hcode

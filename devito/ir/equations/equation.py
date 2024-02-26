@@ -8,14 +8,17 @@ from devito.ir.support import (GuardFactor, Interval, IntervalGroup, IterationSp
 from devito.symbolics import IntDiv, uxreplace
 from devito.tools import Pickable, Tag, frozendict
 from devito.types import Eq, Inc, ReduceMax, ReduceMin
+from devito.types.petsc import Action, RHS, PreStencil, PETScDummy, Solution, BC
 
-__all__ = ['LoweredEq', 'ClusterizedEq', 'DummyEq', 'OpInc', 'OpMin', 'OpMax']
+__all__ = ['LoweredEq', 'ClusterizedEq', 'DummyEq', 'OpInc', 'OpMin', 'OpMax',
+           'OpAction', 'OpRHS', 'OpPreStencil', 'OpPETScDummy', 'OpSolution', 'OpBC']
 
 
 class IREq(sympy.Eq, Pickable):
 
     __rargs__ = ('lhs', 'rhs')
-    __rkwargs__ = ('ispace', 'conditionals', 'implicit_dims', 'operation')
+    __rkwargs__ = ('ispace', 'conditionals', 'implicit_dims', 'operation', 'target',
+                   'solver_parameters')
 
     @property
     def is_Scalar(self):
@@ -54,6 +57,14 @@ class IREq(sympy.Eq, Pickable):
     @property
     def operation(self):
         return self._operation
+
+    @property
+    def target(self):
+        return self._target
+
+    @property
+    def solver_parameters(self):
+        return self._solver_parameters
 
     @property
     def is_Reduction(self):
@@ -96,7 +107,13 @@ class Operation(Tag):
         reduction_mapper = {
             Inc: OpInc,
             ReduceMax: OpMax,
-            ReduceMin: OpMin
+            ReduceMin: OpMin,
+            Action: OpAction,
+            BC: OpBC,
+            RHS: OpRHS,
+            PETScDummy: OpPETScDummy,
+            PreStencil: OpPreStencil,
+            Solution: OpSolution,
         }
         try:
             return reduction_mapper[type(expr)]
@@ -113,6 +130,12 @@ class Operation(Tag):
 OpInc = Operation('+')
 OpMax = Operation('max')
 OpMin = Operation('min')
+OpAction = Operation('action')
+OpBC = Operation('bc')
+OpRHS = Operation('rhs')
+OpPreStencil = Operation('pre_stencil')
+OpPETScDummy = Operation('dummy')
+OpSolution = Operation('solution')
 
 
 class LoweredEq(IREq):
@@ -206,6 +229,9 @@ class LoweredEq(IREq):
         expr._reads, expr._writes = detect_io(expr)
         expr._implicit_dims = input_expr.implicit_dims
         expr._operation = Operation.detect(input_expr)
+        expr._target = input_expr.target if hasattr(input_expr, 'target') else None
+        expr._solver_parameters = input_expr.solver_parameters \
+            if hasattr(input_expr, 'solver_parameters') else None
 
         return expr
 
@@ -262,6 +288,10 @@ class ClusterizedEq(IREq):
                 expr._conditionals = kwargs.get('conditionals', frozendict())
                 expr._implicit_dims = input_expr.implicit_dims
                 expr._operation = Operation.detect(input_expr)
+                expr._target = input_expr.target \
+                    if hasattr(input_expr, 'target') else None
+                expr._solver_parameters = input_expr.solver_parameters \
+                    if hasattr(input_expr, 'solver_parameters') else None
         elif len(args) == 2:
             # origin: ClusterizedEq(lhs, rhs, **kwargs)
             expr = sympy.Eq.__new__(cls, *args, evaluate=False)

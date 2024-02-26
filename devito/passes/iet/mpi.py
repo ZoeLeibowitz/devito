@@ -77,7 +77,9 @@ def _hoist_halospots(iet):
     rules = [rule0, rule1]
 
     # Precompute scopes to save time
-    scopes = {i: Scope([e.expr for e in v]) for i, v in MapNodes().visit(iet).items()}
+    scopes = {i: Scope(
+        [e.expr for e in v if not isinstance(
+            e, Call)]) for i, v in MapNodes().visit(iet).items()}
 
     # Analysis
     hsmapper = {}
@@ -109,7 +111,6 @@ def _hoist_halospots(iet):
                         hsmapper[hs] = hsmapper[hs].drop(f)
                         imapper[i].append(hs.halo_scheme.project(f))
                         break
-
     # Post-process analysis
     mapper = {i: HaloSpot(i._rebuild(), HaloScheme.union(hss))
               for i, hss in imapper.items()}

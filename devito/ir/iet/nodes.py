@@ -10,7 +10,8 @@ import cgen as c
 from sympy import IndexedBase, sympify
 
 from devito.data import FULL
-from devito.ir.equations import DummyEq, OpInc, OpMin, OpMax
+from devito.ir.equations import (DummyEq, OpInc, OpMin, OpMax, OpAction, OpBC,
+                                 OpRHS, OpPETScDummy, OpSolution, OpPreStencil)
 from devito.ir.support import (INBOUND, SEQUENTIAL, PARALLEL, PARALLEL_IF_ATOMIC,
                                PARALLEL_IF_PVT, VECTORIZED, AFFINE, Property,
                                Forward, detect_io)
@@ -21,14 +22,14 @@ from devito.types.basic import (AbstractFunction, AbstractSymbol, Basic, Indexed
                                 Symbol)
 from devito.types.object import AbstractObject, LocalObject
 
-__all__ = ['Node', 'MultiTraversable', 'Block', 'Expression', 'Callable',
-           'Call', 'ExprStmt', 'Conditional', 'Iteration', 'List', 'Section',
-           'TimedList', 'Prodder', 'MetaCall', 'PointerCast', 'HaloSpot',
-           'Definition', 'ExpressionBundle', 'AugmentedExpression',
-           'Increment', 'Return', 'While', 'ListMajor', 'ParallelIteration',
-           'ParallelBlock', 'Dereference', 'Lambda', 'SyncSpot', 'Pragma',
-           'DummyExpr', 'BlankLine', 'ParallelTree', 'BusyWait', 'UsingNamespace',
-           'CallableBody', 'Transfer', 'Callback']
+__all__ = ['Node', 'Block', 'Expression', 'Callable', 'Call', 'ExprStmt',
+           'Conditional', 'Iteration', 'List', 'Section', 'TimedList', 'Prodder',
+           'MetaCall', 'PointerCast', 'HaloSpot', 'Definition', 'ExpressionBundle',
+           'AugmentedExpression', 'Increment', 'Return', 'While', 'ListMajor',
+           'ParallelIteration', 'ParallelBlock', 'Dereference', 'Lambda',
+           'SyncSpot', 'Pragma', 'DummyExpr', 'BlankLine', 'ParallelTree',
+           'BusyWait', 'CallableBody', 'Transfer', 'Callback', 'ActionExpr',
+           'RHSExpr', 'PETScDumExpr', 'SolutionExpr', 'PreExpr', 'BCExpr']
 
 # First-class IET nodes
 
@@ -482,6 +483,60 @@ class Increment(AugmentedExpression):
 
     def __init__(self, expr, pragmas=None):
         super().__init__(expr, pragmas=pragmas, operation=OpInc)
+
+
+class ActionExpr(Expression):
+
+    def __init__(self, expr, pragmas=None, operation=OpAction,
+                 target=None, solver_parameters=None):
+        super().__init__(expr, pragmas=pragmas, operation=operation)
+        self.target = target
+        self.solver_parameters = solver_parameters
+
+
+class BCExpr(Expression):
+
+    def __init__(self, expr, pragmas=None, operation=OpBC,
+                 target=None, solver_parameters=None):
+        super().__init__(expr, pragmas=pragmas, operation=operation)
+        self.target = target
+        self.solver_parameters = solver_parameters
+
+
+class RHSExpr(Expression):
+
+    def __init__(self, expr, pragmas=None, operation=OpRHS,
+                 target=None, solver_parameters=None):
+        super().__init__(expr, pragmas=pragmas, operation=operation)
+        self.target = target
+        self.solver_parameters = solver_parameters
+
+
+class PETScDumExpr(Expression):
+
+    def __init__(self, expr, pragmas=None, operation=OpPETScDummy,
+                 target=None, solver_parameters=None):
+        super().__init__(expr, pragmas=pragmas, operation=operation)
+        self.target = target
+        self.solver_parameters = solver_parameters
+
+
+class SolutionExpr(Expression):
+
+    def __init__(self, expr, pragmas=None, operation=OpSolution,
+                 target=None, solver_parameters=None):
+        super().__init__(expr, pragmas=pragmas, operation=operation)
+        self.target = target
+        self.solver_parameters = solver_parameters
+
+
+class PreExpr(Expression):
+
+    def __init__(self, expr, pragmas=None, operation=OpPreStencil,
+                 target=None, solver_parameters=None):
+        super().__init__(expr, pragmas=pragmas, operation=operation)
+        self.target = target
+        self.solver_parameters = solver_parameters
 
 
 class Iteration(Node):
@@ -1134,8 +1189,9 @@ class Callback(Call):
     engine fails to bind the callback to a specific Call. Consequently,
     errors occur during the creation of the call graph.
     """
-
-    def __init__(self, name, retval, param_types):
+    # TODO: Create a common base class for Call and Callback to avoid
+    # having to add arguments=None here.
+    def __init__(self, name, retval, param_types, arguments=None):
         super().__init__(name=name)
         self.retval = retval
         self.param_types = as_tuple(param_types)
