@@ -480,6 +480,24 @@ class Increment(AugmentedExpression):
         super().__init__(expr, pragmas=pragmas, operation=OpInc)
 
 
+class ActionExpr(Expression):
+
+    def __init__(self, expr, pragmas=None, operation=OpAction,
+                 target=None, solver_parameters=None):
+        super().__init__(expr, pragmas=pragmas, operation=operation)
+        self.target = target
+        self.solver_parameters = solver_parameters
+
+
+class RHSExpr(Expression):
+
+    def __init__(self, expr, pragmas=None, operation=OpRHS,
+                 target=None, solver_parameters=None):
+        super().__init__(expr, pragmas=pragmas, operation=operation)
+        self.target = target
+        self.solver_parameters = solver_parameters
+
+
 class Iteration(Node):
 
     """
