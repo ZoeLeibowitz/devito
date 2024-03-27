@@ -30,7 +30,11 @@ __all__ = ['Node', 'MultiTraversable', 'Block', 'Expression', 'Callable',
            'Increment', 'Return', 'While', 'ListMajor', 'ParallelIteration',
            'ParallelBlock', 'Dereference', 'Lambda', 'SyncSpot', 'Pragma',
            'DummyExpr', 'BlankLine', 'ParallelTree', 'BusyWait', 'UsingNamespace',
+<<<<<<< HEAD
            'Using', 'CallableBody', 'Transfer', 'Callback']
+=======
+           'CallableBody', 'Transfer', 'Callback', 'MatVecAction', 'RHSLinearSystem']
+>>>>>>> 80e9b693c (types: Remove hasattr from LoweredEq, create common node class for petsc exprs and edit iteration check in clsuter.py)
 
 # First-class IET nodes
 
@@ -480,22 +484,31 @@ class Increment(AugmentedExpression):
         super().__init__(expr, pragmas=pragmas, operation=OpInc)
 
 
-class ActionExpr(Expression):
+class LinearSolverExpression(Expression):
+    """General expression required by a matrix-free linear solve of the
+    form Ax=b."""
 
-    def __init__(self, expr, pragmas=None, operation=OpAction,
+    def __init__(self, expr, pragmas=None, operation=None,
                  target=None, solver_parameters=None):
         super().__init__(expr, pragmas=pragmas, operation=operation)
         self.target = target
         self.solver_parameters = solver_parameters
 
 
-class RHSExpr(Expression):
+class MatVecAction(LinearSolverExpression):
+
+    def __init__(self, expr, pragmas=None, operation=OpMatVec,
+                 target=None, solver_parameters=None):
+        super().__init__(expr, pragmas=pragmas, operation=operation,
+                         target=target, solver_parameters=solver_parameters)
+
+
+class RHSLinearSystem(LinearSolverExpression):
 
     def __init__(self, expr, pragmas=None, operation=OpRHS,
                  target=None, solver_parameters=None):
-        super().__init__(expr, pragmas=pragmas, operation=operation)
-        self.target = target
-        self.solver_parameters = solver_parameters
+        super().__init__(expr, pragmas=pragmas, operation=operation,
+                         target=target, solver_parameters=solver_parameters)
 
 
 class Iteration(Node):
