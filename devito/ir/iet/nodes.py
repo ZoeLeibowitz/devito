@@ -30,11 +30,7 @@ __all__ = ['Node', 'MultiTraversable', 'Block', 'Expression', 'Callable',
            'Increment', 'Return', 'While', 'ListMajor', 'ParallelIteration',
            'ParallelBlock', 'Dereference', 'Lambda', 'SyncSpot', 'Pragma',
            'DummyExpr', 'BlankLine', 'ParallelTree', 'BusyWait', 'UsingNamespace',
-<<<<<<< HEAD
            'Using', 'CallableBody', 'Transfer', 'Callback']
-=======
-           'CallableBody', 'Transfer', 'Callback', 'MatVecAction', 'RHSLinearSystem']
->>>>>>> 80e9b693c (types: Remove hasattr from LoweredEq, create common node class for petsc exprs and edit iteration check in clsuter.py)
 
 # First-class IET nodes
 
@@ -511,6 +507,19 @@ class RHSLinearSystem(LinearSolverExpression):
 
     def __init__(self, expr, pragmas=None, operation=OpRHS):
         super().__init__(expr, pragmas=pragmas, operation=operation)
+
+
+class LinSolveMock(LinearSolverExpression):
+
+    """
+    Placeholder expression to wrap MockEqs, which are dropped
+    at the IET level.
+    """
+    # NOTE: The requirement for init=False otherwise there are issues
+    # inside specialize_iet?
+
+    def __init__(self, expr, init=False, pragmas=None, operation=OpMock):
+        super().__init__(expr, init=init, pragmas=pragmas, operation=operation)
 
 
 class Iteration(Node):
