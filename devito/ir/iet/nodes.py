@@ -509,17 +509,6 @@ class RHSLinearSystem(LinearSolverExpression):
         super().__init__(expr, pragmas=pragmas, operation=operation)
 
 
-class LinSolveMock(LinearSolverExpression):
-
-    """
-    Placeholder expression to wrap MockEqs, which are dropped
-    at the IET level.
-    """
-
-    def __init__(self, expr, pragmas=None, operation=OpMock):
-        super().__init__(expr, pragmas=pragmas, operation=operation)
-
-
 class Iteration(Node):
 
     """
