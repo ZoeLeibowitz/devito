@@ -381,6 +381,10 @@ class Operator(Callable):
         # Build a sequence of Clusters from a sequence of Eqs
         clusters = clusterize(expressions, **kwargs)
 
+        # Lift iteration spaces surrounding PETSc equations to produce
+        # distinct iteration loops.
+        clusters = petsc_lift(clusters)
+
         # Operation count before specialization
         init_ops = sum(estimate_cost(c.exprs) for c in clusters if c.is_dense)
 
