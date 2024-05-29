@@ -22,12 +22,13 @@ from devito.mpi import MPI
 from devito.parameters import configuration
 from devito.passes import (Graph, lower_index_derivatives, generate_implicit,
                            generate_macros, minimize_symbols, unevaluate,
-                           error_mapper, petsc_lift, lower_petsc)
+                           error_mapper, petsc_lift)
 from devito.symbolics import estimate_cost
 from devito.tools import (DAG, OrderedSet, Signer, ReducerMap, as_tuple, flatten,
                           filter_sorted, frozendict, is_integer, split, timed_pass,
                           timed_region, contains_val)
 from devito.types import Grid, Evaluable
+from devito.petsc import lower_petsc
 
 __all__ = ['Operator']
 
