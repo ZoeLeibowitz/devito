@@ -28,7 +28,11 @@ from devito.tools import (DAG, OrderedSet, Signer, ReducerMap, as_tuple, flatten
                           filter_sorted, frozendict, is_integer, split, timed_pass,
                           timed_region, contains_val)
 from devito.types import Grid, Evaluable
+<<<<<<< HEAD
 from devito.petsc.iet.passes import lower_petsc
+=======
+from devito.petsc.iet import lower_petsc
+>>>>>>> ba1ad2bcf (fix circular imports)
 from devito.petsc.clusters import petsc_lift
 
 __all__ = ['Operator']
