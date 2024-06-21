@@ -7,8 +7,9 @@ from devito.ir.iet import (Call, ElementalFunction, Definition, DummyExpr,
                            PointerCast, retrieve_iteration_tree)
 from devito.passes.iet.languages.C import CDataManager
 from devito.petsc.types import (DM, Mat, Vec, PetscMPIInt, KSP,
-                                PC, KSPConvergedReason, PETScArray, PETScSolve,
+                                PC, KSPConvergedReason, PETScArray,
                                 LinearSolveExpr, PETScStruct)
+from devito.petsc.solve import PETScSolve
 from devito.petsc.iet.nodes import MatVecAction, RHSLinearSystem
 
 
