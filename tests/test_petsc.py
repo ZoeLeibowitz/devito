@@ -1,18 +1,23 @@
 import numpy as np
-from devito import Grid, Function, Eq, Operator
+import os
+from conftest import skipif
+from devito import Grid, Function, Eq, Operator, switchconfig
 from devito.ir.iet import (Call, ElementalFunction, Definition, DummyExpr,
-                           MatVecAction, FindNodes, RHSLinearSystem,
+                           FindNodes,
                            PointerCast, retrieve_iteration_tree)
 from devito.passes.iet.languages.C import CDataManager
-from devito.types import (DM, Mat, Vec, PetscMPIInt, KSP,
-                          PC, KSPConvergedReason, PETScArray, PETScSolve)
+from devito.petsc.types import (DM, Mat, Vec, PetscMPIInt, KSP,
+                                PC, KSPConvergedReason, PETScArray, PETScSolve,
+                                LinearSolveExpr, PETScStruct)
+from devito.petsc.iet.nodes import MatVecAction, RHSLinearSystem
 
 
+@skipif('petsc')
 def test_petsc_local_object():
     """
     Test C++ support for PETSc LocalObjects.
     """
-    lo0 = DM('da')
+    lo0 = DM('da', stencil_width=1)
     lo1 = Mat('A')
     lo2 = Vec('x')
     lo3 = PetscMPIInt('size')
@@ -35,6 +40,7 @@ def test_petsc_local_object():
     assert 'KSPConvergedReason reason;' in str(iet)
 
 
+@skipif('petsc')
 def test_petsc_functions():
     """
     Test C++ support for PETScArrays.
@@ -67,6 +73,7 @@ def test_petsc_functions():
     assert str(expr) == 'ptr0[x][y] = ptr1[x][y] + 1;'
 
 
+@skipif('petsc')
 def test_petsc_subs():
     """
     Test support for PETScArrays in substitutions.
@@ -92,6 +99,7 @@ def test_petsc_subs():
         ' + arr(x, y - h_y)/h_y**2 + arr(x, y + h_y)/h_y**2'
 
 
+@skipif('petsc')
 def test_petsc_solve():
     """
     Test PETScSolve.
@@ -105,18 +113,25 @@ def test_petsc_solve():
 
     petsc = PETScSolve(eqn, f)
 
-    op = Operator(petsc, opt='noop')
+    with switchconfig(openmp=False):
+        op = Operator(petsc, opt='noop')
 
-    action_expr = FindNodes(MatVecAction).visit(op)
+    callable_roots = [meta_call.root for meta_call in op._func_table.values()]
 
+    matvec_callback = [root for root in callable_roots if root.name == 'MyMatShellMult_f']
+
+    action_expr = FindNodes(MatVecAction).visit(matvec_callback[0])
     rhs_expr = FindNodes(RHSLinearSystem).visit(op)
 
-    assert str(action_expr[-1].expr.rhs.args[0]) == \
-        'x_matvec_f[x + 1, y + 2]/h_x**2 - 2.0*x_matvec_f[x + 2, y + 2]/h_x**2' + \
-        ' + x_matvec_f[x + 3, y + 2]/h_x**2 + x_matvec_f[x + 2, y + 1]/h_y**2' + \
-        ' - 2.0*x_matvec_f[x + 2, y + 2]/h_y**2 + x_matvec_f[x + 2, y + 3]/h_y**2'
+    assert str(action_expr[-1].expr.rhs) == \
+        'ctx->h_x**(-2)*x_matvec_f[x + 1, y + 2]' + \
+        ' - 2.0*ctx->h_x**(-2)*x_matvec_f[x + 2, y + 2]' + \
+        ' + ctx->h_x**(-2)*x_matvec_f[x + 3, y + 2]' + \
+        ' + ctx->h_y**(-2)*x_matvec_f[x + 2, y + 1]' + \
+        ' - 2.0*ctx->h_y**(-2)*x_matvec_f[x + 2, y + 2]' + \
+        ' + ctx->h_y**(-2)*x_matvec_f[x + 2, y + 3]'
 
-    assert str(rhs_expr[-1].expr.rhs.args[0]) == 'g[x + 2, y + 2]'
+    assert str(rhs_expr[-1].expr.rhs) == 'g[x + 2, y + 2]'
 
     # Check the iteration bounds are correct.
     assert op.arguments().get('x_m') == 0
@@ -124,21 +139,46 @@ def test_petsc_solve():
     assert op.arguments().get('y_M') == 1
     assert op.arguments().get('x_M') == 1
 
-    # Check the target
-    assert rhs_expr[-1].expr.rhs.target == f
-    assert action_expr[-1].expr.rhs.target == f
+    assert len(retrieve_iteration_tree(op)) == 1
 
-    # Check the solver parameters
-    assert rhs_expr[-1].expr.rhs.solver_parameters == \
-        {'ksp_type': 'gmres', 'pc_type': 'jacobi'}
-    assert action_expr[-1].expr.rhs.solver_parameters == \
-        {'ksp_type': 'gmres', 'pc_type': 'jacobi'}
-
-    # Check the matvec action and rhs have distinct iteration loops i.e
-    # each iteration space was "lifted" properly.
-    assert len(retrieve_iteration_tree(op)) == 2
+    # TODO: Remove pragmas from PETSc callback functions
+    assert len(matvec_callback[0].parameters) == 3
 
 
+@skipif('petsc')
+def test_multiple_petsc_solves():
+    """
+    Test multiple PETScSolves.
+    """
+    grid = Grid((2, 2))
+
+    f1 = Function(name='f1', grid=grid, space_order=2)
+    g1 = Function(name='g1', grid=grid, space_order=2)
+
+    f2 = Function(name='f2', grid=grid, space_order=2)
+    g2 = Function(name='g2', grid=grid, space_order=2)
+
+    eqn1 = Eq(f1.laplace, g1)
+    eqn2 = Eq(f2.laplace, g2)
+
+    petsc1 = PETScSolve(eqn1, f1)
+    petsc2 = PETScSolve(eqn2, f2)
+
+    with switchconfig(openmp=False):
+        op = Operator(petsc1+petsc2, opt='noop')
+
+    callable_roots = [meta_call.root for meta_call in op._func_table.values()]
+
+    assert len(callable_roots) == 2
+
+    structs = [i for i in op.parameters if isinstance(i, PETScStruct)]
+
+    # Only create 1 struct per Grid/DMDA
+    assert len(structs) == 1
+    assert len(structs[0].fields) == 6
+
+
+@skipif('petsc')
 def test_petsc_cast():
     """
     Test casting of PETScArray.
@@ -166,6 +206,7 @@ def test_petsc_cast():
         '(PetscScalar (*)[info.gym][info.gxm]) arr2_vec;'
 
 
+@skipif('petsc')
 def test_no_automatic_cast():
     """
     Verify that the compiler does not automatically generate casts for PETScArrays.
@@ -180,6 +221,101 @@ def test_no_automatic_cast():
 
     eqn = Eq(arr, f.laplace)
 
-    op = Operator(eqn, opt='noop')
+    with switchconfig(openmp=False):
+        op = Operator(eqn, opt='noop')
 
     assert len(op.body.casts) == 1
+
+
+@skipif('petsc')
+def test_LinearSolveExpr():
+
+    grid = Grid((2, 2))
+
+    f = Function(name='f', grid=grid, space_order=2)
+    g = Function(name='g', grid=grid, space_order=2)
+
+    eqn = Eq(f, g.laplace)
+
+    linsolveexpr = LinearSolveExpr(eqn.rhs, target=f)
+
+    # Check the target
+    assert linsolveexpr.target == f
+    # Check the solver parameters
+    assert linsolveexpr.solver_parameters == \
+        {'ksp_type': 'gmres', 'pc_type': 'jacobi', 'ksp_rtol': 1e-07,
+         'ksp_atol': 1e-50, 'ksp_divtol': 10000.0, 'ksp_max_it': 10000}
+
+
+@skipif('petsc')
+def test_dmda_create():
+
+    grid1 = Grid((2))
+    grid2 = Grid((2, 2))
+    grid3 = Grid((4, 5, 6))
+
+    f1 = Function(name='f1', grid=grid1, space_order=2)
+    f2 = Function(name='f2', grid=grid2, space_order=4)
+    f3 = Function(name='f3', grid=grid3, space_order=6)
+
+    eqn1 = Eq(f1.laplace, 10)
+    eqn2 = Eq(f2.laplace, 10)
+    eqn3 = Eq(f3.laplace, 10)
+
+    petsc1 = PETScSolve(eqn1, f1)
+    petsc2 = PETScSolve(eqn2, f2)
+    petsc3 = PETScSolve(eqn3, f3)
+
+    with switchconfig(openmp=False):
+        op1 = Operator(petsc1, opt='noop')
+        op2 = Operator(petsc2, opt='noop')
+        op3 = Operator(petsc3, opt='noop')
+
+    assert 'PetscCall(DMDACreate1d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
+        '2,1,2,NULL,&(da_so_2)));' in str(op1)
+
+    assert 'PetscCall(DMDACreate2d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
+        'DM_BOUNDARY_GHOSTED,DMDA_STENCIL_BOX,2,2,1,1,1,4,NULL,NULL,&(da_so_4)));' \
+        in str(op2)
+
+    assert 'PetscCall(DMDACreate3d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
+        'DM_BOUNDARY_GHOSTED,DM_BOUNDARY_GHOSTED,DMDA_STENCIL_BOX,6,5,4' + \
+        ',1,1,1,1,6,NULL,NULL,NULL,&(da_so_6)));' in str(op3)
+
+    # Check unique DMDA is created per grid, per space_order
+    f4 = Function(name='f4', grid=grid2, space_order=6)
+    eqn4 = Eq(f4.laplace, 10)
+    petsc4 = PETScSolve(eqn4, f4)
+    with switchconfig(openmp=False):
+        op4 = Operator(petsc2+petsc2+petsc4, opt='noop')
+    assert str(op4).count('DMDACreate2d') == 2
+
+
+@skipif('petsc')
+def test_cinterface_petsc_struct():
+
+    grid = Grid(shape=(11, 11))
+    f = Function(name='f', grid=grid, space_order=2)
+    eq = Eq(f.laplace, 10)
+    petsc = PETScSolve(eq, f)
+
+    name = "foo"
+    with switchconfig(openmp=False):
+        op = Operator(petsc, name=name)
+
+    # Trigger the generation of a .c and a .h files
+    ccode, hcode = op.cinterface(force=True)
+
+    dirname = op._compiler.get_jit_dir()
+    assert os.path.isfile(os.path.join(dirname, "%s.c" % name))
+    assert os.path.isfile(os.path.join(dirname, "%s.h" % name))
+
+    ccode = str(ccode)
+    hcode = str(hcode)
+
+    assert 'include "%s.h"' % name in ccode
+
+    # The public `struct MatContext` only appears in the header file
+    assert any(isinstance(i, PETScStruct) for i in op.parameters)
+    assert 'struct MatContext\n{' not in ccode
+    assert 'struct MatContext\n{' in hcode
