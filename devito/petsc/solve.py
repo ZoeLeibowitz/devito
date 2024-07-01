@@ -7,6 +7,7 @@ from devito.operations.solve import eval_time_derivatives
 from devito.petsc.types import PETScArray, LinearSolveExpr, MatVecEq, RHSEq
 
 from sympy import simplify
+from devito.symbolics import retrieve_functions, uxreplace
 
 
 __all__ = ['PETScSolve']
@@ -27,13 +28,21 @@ def PETScSolve(eq, target, bcs=None, solver_parameters=None, **kwargs):
                    halo=target.halo[1:] if is_time_dep else target.halo)
         for prefix in ['y_matvec', 'x_matvec', 'b_tmp']]
 
-    # TODO: Extend to rearrange equation for implicit time stepping.
-    matvecaction = MatVecEq(y_matvec, LinearSolveExpr(eq.lhs.subs(target, x_matvec),
-                            target=target, solver_parameters=solver_parameters),
-                            subdomain=eq.subdomain)
+    b, F_target = separate_eqn(eq, target)
+
+    # Args were updated so need to update target to enable uxreplace on F_target
+    new_target = {func for func in retrieve_functions(F_target) if
+                  func.function == target.function}.pop()
+
+    # TODO: Current assumption is that problem is linear and user has not provided
+    # a jacobian. Hence, we can use F_target to form the jac-vec product
+    matvecaction = MatVecEq(
+        y_matvec, LinearSolveExpr(uxreplace(F_target, {new_target: x_matvec}),
+                                  target=target, solver_parameters=solver_parameters),
+        subdomain=eq.subdomain)
 
     # Part of pde that remains constant at each timestep
-    rhs = RHSEq(b_tmp, LinearSolveExpr(eq.rhs, target=target,
+    rhs = RHSEq(b_tmp, LinearSolveExpr(b, target=target,
                 solver_parameters=solver_parameters), subdomain=eq.subdomain)
 
     if not bcs:
@@ -66,8 +75,9 @@ def separate_eqn(eqn, target):
     zeroed_eqn = Eq(eqn.lhs - eqn.rhs, 0)
     tmp = eval_time_derivatives(zeroed_eqn.lhs)
     b = remove_target(tmp, target)
-    F_target = simplify(tmp - b)
-
+    # Is this ok? Is there another way of using simplify
+    # but maintaining its Devito type?
+    F_target = Add(simplify(tmp - b))
     return -b, F_target
 
 
@@ -105,3 +115,51 @@ def _(expr, target):
 @remove_target.register(Derivative)
 def _(expr, target):
     return 0 if expr.has(target) else expr
+
+
+def centre_stencil(eqn, target):
+    """
+    Extract the centre stencil from equation.
+    This function assumes that the core stencil, which is the stencil from
+    which the centre stencil will be extracted, is located on the RHS of
+    the input equation (first argument).
+
+    NOTE: At the point of entry, the time derivatives are likely evaluated, but
+    not the spatial derivatives. This necessitates evaluating 'eqn'
+    before deriving the centre stencil. By doing so, we ensure that
+    all derivatives, including spatial derivatives, are correctly accounted for
+    in the centre stencil.
+    """
+    centre = extract_centre(eqn.evaluate.rhs, target)
+    return centre
+
+
+@singledispatch
+def extract_centre(expr, target):
+    return expr if expr == target else 0
+
+
+@extract_centre.register(Add)
+@extract_centre.register(EvalDerivative)
+def _(expr, target):
+    if not expr.has(target):
+        return 0
+
+    args = [extract_centre(a, target) for a in expr.args]
+    return expr.func(*args, evaluate=False)
+
+
+@extract_centre.register(Mul)
+def _(expr, target):
+    if not expr.has(target):
+        return 0
+
+    args = []
+    for a in expr.args:
+        if not a.has(target):
+            args.append(a)
+        else:
+            a1 = extract_centre(a, target)
+            args.append(a1)
+
+    return expr.func(*args, evaluate=False)
