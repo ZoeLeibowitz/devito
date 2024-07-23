@@ -327,7 +327,6 @@ class CGen(Visitor):
 
     def _gen_signature(self, o, is_declaration=False):
         decls = self._args_decl(o.parameters)
-
         prefix = ' '.join(o.prefix + (self._gen_rettype(o.retval),))
 
         if o.attributes:
