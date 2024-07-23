@@ -30,7 +30,7 @@ __all__ = ['Node', 'MultiTraversable', 'Block', 'Expression', 'Callable',
            'Increment', 'Return', 'While', 'ListMajor', 'ParallelIteration',
            'ParallelBlock', 'Dereference', 'Lambda', 'SyncSpot', 'Pragma',
            'DummyExpr', 'BlankLine', 'ParallelTree', 'BusyWait', 'UsingNamespace',
-           'Using', 'CallableBody', 'Transfer', 'Callback']
+           'Using', 'CallableBody', 'Transfer', 'Callback', 'FixedArgsCallable']
 
 # First-class IET nodes
 
@@ -759,6 +759,15 @@ class Callable(Node):
         return self.all_parameters
 
 
+class FixedArgsCallable(Callable):
+
+    """
+    A Callable class that enforces a fixed function signature.
+    """
+
+    pass
+
+
 class CallableBody(MultiTraversable):
 
     """
@@ -1037,10 +1046,15 @@ class Dereference(ExprStmt, Node):
     The following cases are supported:
 
         * `pointer` is a PointerArray or TempFunction, and `pointee` is an Array.
+<<<<<<< HEAD
         * `pointer` is an ArrayObject representing a pointer to a C struct, and
           `pointee` is a field in `pointer`.
         * `pointer` is a Symbol with its _C_ctype deriving from ct._Pointer, and
           `pointee` is a Symbol representing the dereferenced value.
+=======
+        * `pointer` is an ArrayObject or CCompositeObject representing a pointer
+           to a C struct, and `pointee` is a field in `pointer`.
+>>>>>>> 1fe94ea29 (compiler: Create mixin for ThreadCallable and PETScCallable)
     """
 
     is_Dereference = True
