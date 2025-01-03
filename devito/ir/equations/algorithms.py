@@ -169,11 +169,7 @@ def concretize_subdims(exprs, **kwargs):
     across `exprs`, such as the thickness symbols.
     """
     sregistry = kwargs.get('sregistry')
-
-    try:
-        mapper = kwargs['concretize_mapper']
-    except KeyError:
-        kwargs['concretize_mapper'] = mapper = {}
+    mapper = kwargs.get('concretize_mapper')
 
     rebuilt = {}  # Rebuilt implicit dims etc which are shared between dimensions
 
