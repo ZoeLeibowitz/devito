@@ -265,6 +265,9 @@ class Operator(Callable):
         kwargs.setdefault('langbb', cls._Target.langbb())
         kwargs.setdefault('printer', cls._Target.Printer)
 
+        # TODO: To be updated based on changes in #2509
+        kwargs.setdefault('concretize_mapper', {})
+
         expressions = as_tuple(expressions)
 
         # Enable recursive lowering
