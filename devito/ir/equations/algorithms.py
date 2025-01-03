@@ -170,7 +170,7 @@ def concretize_subdims(exprs, **kwargs):
     """
     sregistry = kwargs.get('sregistry')
 
-    try: 
+    try:
         mapper = kwargs['concretize_mapper']
     except KeyError:
         kwargs['concretize_mapper'] = mapper = {}

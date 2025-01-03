@@ -615,7 +615,7 @@ def test_petsc_struct():
 
 
 @skipif('petsc')
-def test_apply_serial(mode):
+def test_apply_serial():
 
     grid = Grid(shape=(13, 13), dtype=np.float64)
 
