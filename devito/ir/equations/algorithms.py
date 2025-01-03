@@ -174,6 +174,7 @@ def concretize_subdims(exprs, **kwargs):
         mapper = kwargs['concretize_mapper']
     except KeyError:
         kwargs['concretize_mapper'] = mapper = {}
+
     rebuilt = {}  # Rebuilt implicit dims etc which are shared between dimensions
 
     _concretize_subdims(exprs, mapper, rebuilt, sregistry)
