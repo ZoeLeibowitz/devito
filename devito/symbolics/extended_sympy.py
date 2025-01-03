@@ -252,10 +252,6 @@ class FieldFromPointer(CallFromPointer, Pickable):
     def field(self):
         return self.call
 
-    @property
-    def free_symbols(self):
-        return {self.field}
-
     __repr__ = __str__
 
 
