@@ -193,7 +193,7 @@ def concretize_subdims(exprs, **kwargs):
     mapper = kwargs.get('concretize_mapper')
 
     rebuilt = {}  # Rebuilt implicit dims etc which are shared between dimensions
-    # from IPython import embed; embed()
+
     _concretize_subdims(exprs, mapper, rebuilt, sregistry)
     if not mapper:
         return exprs
@@ -243,7 +243,6 @@ def _(expr, mapper, rebuilt, sregistry):
 
 @_concretize_subdims.register(Thickness)
 def _(tkn, mapper, rebuilt, sregistry):
-    # from IPython import embed; embed()
     if tkn in mapper:
         # Already have a substitution for this thickness
         return
@@ -253,7 +252,6 @@ def _(tkn, mapper, rebuilt, sregistry):
 
 @_concretize_subdims.register(SubDimension)
 def _(d, mapper, rebuilt, sregistry):
-    # from IPython import embed; embed()
     if d in mapper:
         # Already have a substitution for this dimension
         return
