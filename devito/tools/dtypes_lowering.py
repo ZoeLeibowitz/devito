@@ -13,7 +13,7 @@ __all__ = ['int2', 'int3', 'int4', 'float2', 'float3', 'float4', 'double2',  # n
            'double3', 'double4', 'dtypes_vector_mapper', 'dtype_to_mpidtype',
            'dtype_to_cstr', 'dtype_to_ctype', 'dtype_to_mpitype', 'dtype_len',
            'ctypes_to_cstr', 'c_restrict_void_p', 'ctypes_vector_mapper',
-           'is_external_ctype', 'infer_dtype', 'CustomDtype']
+           'is_external_ctype', 'infer_dtype', 'CustomDtype', 'CustomIntType']
 
 
 # *** Custom np.dtypes
@@ -121,6 +121,11 @@ class CustomDtype:
                            self.modifier)
 
     __str__ = __repr__
+
+
+# TODO: Consider if this should be an instance instead of a subclass?
+class CustomIntType(CustomDtype):
+    pass
 
 
 # *** np.dtypes lowering
@@ -278,6 +283,8 @@ def is_external_ctype(ctype, includes):
     True if `ctype` is known to be declared in one of the given `includes`
     files, False otherwise.
     """
+    if isinstance(ctype, CustomDtype):
+        return False
     # Get the base type
     while issubclass(ctype, ctypes._Pointer):
         ctype = ctype._type_
