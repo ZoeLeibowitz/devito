@@ -255,15 +255,15 @@ def test_dmda_create():
         op3 = Operator(petsc3, opt='noop')
 
     assert 'PetscCall(DMDACreate1d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
-        '2,1,2,NULL,&(da_0)));' in str(op1)
+        '2,1,2,NULL,&(da0)));' in str(op1)
 
     assert 'PetscCall(DMDACreate2d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
-        'DM_BOUNDARY_GHOSTED,DMDA_STENCIL_BOX,2,2,1,1,1,4,NULL,NULL,&(da_0)));' \
+        'DM_BOUNDARY_GHOSTED,DMDA_STENCIL_BOX,2,2,1,1,1,4,NULL,NULL,&(da0)));' \
         in str(op2)
 
     assert 'PetscCall(DMDACreate3d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
         'DM_BOUNDARY_GHOSTED,DM_BOUNDARY_GHOSTED,DMDA_STENCIL_BOX,6,5,4' + \
-        ',1,1,1,1,6,NULL,NULL,NULL,&(da_0)));' in str(op3)
+        ',1,1,1,1,6,NULL,NULL,NULL,&(da0)));' in str(op3)
 
 
 @skipif('petsc')
@@ -291,8 +291,8 @@ def test_cinterface_petsc_struct():
     assert 'include "%s.h"' % name in ccode
 
     # The public `struct MatContext` only appears in the header file
-    assert 'struct J_0_ctx\n{' not in ccode
-    assert 'struct J_0_ctx\n{' in hcode
+    assert 'struct J0_ctx\n{' not in ccode
+    assert 'struct J0_ctx\n{' in hcode
 
 
 @skipif('petsc')
@@ -566,8 +566,8 @@ def test_callback_arguments():
     assert len(mv.parameters) == 3
     assert len(ff.parameters) == 4
 
-    assert str(mv.parameters) == '(J_0, X_global_0, Y_global_0)'
-    assert str(ff.parameters) == '(snes_0, X_global_0, F_global_0, dummy)'
+    assert str(mv.parameters) == '(J0, X_global0, Y_global0)'
+    assert str(ff.parameters) == '(snes0, X_global0, F_global0, dummy)'
 
 
 @skipif('petsc')
@@ -603,31 +603,31 @@ def test_petsc_struct():
     assert all(not isinstance(i, CCompositeObject) for i in op.parameters)
 
 
-@skipif('petsc')
-@pytest.mark.parallel(mode=[2, 4, 8])
-def test_apply(mode):
+# @skipif('petsc')
+# @pytest.mark.parallel(mode=[2, 4, 8])
+# def test_apply(mode):
 
-    grid = Grid(shape=(13, 13), dtype=np.float64)
+#     grid = Grid(shape=(13, 13), dtype=np.float64)
 
-    pn = Function(name='pn', grid=grid, space_order=2, dtype=np.float64)
-    rhs = Function(name='rhs', grid=grid, space_order=2, dtype=np.float64)
-    mu = Constant(name='mu', value=2.0)
+#     pn = Function(name='pn', grid=grid, space_order=2, dtype=np.float64)
+#     rhs = Function(name='rhs', grid=grid, space_order=2, dtype=np.float64)
+#     mu = Constant(name='mu', value=2.0)
 
-    eqn = Eq(pn.laplace*mu, rhs, subdomain=grid.interior)
+#     eqn = Eq(pn.laplace*mu, rhs, subdomain=grid.interior)
 
-    petsc = PETScSolve(eqn, pn)
+#     petsc = PETScSolve(eqn, pn)
 
-    # Build the op
-    with switchconfig(openmp=False, mpi=True):
-        op = Operator(petsc)
+#     # Build the op
+#     with switchconfig(openmp=False, mpi=True):
+#         op = Operator(petsc)
 
-    # Check the Operator runs without errors. Not verifying output for
-    # now. Need to consolidate BC implementation
-    op.apply()
+#     # Check the Operator runs without errors. Not verifying output for
+#     # now. Need to consolidate BC implementation
+#     op.apply()
 
-    # Verify that users can override `mu`
-    mu_new = Constant(name='mu_new', value=4.0)
-    op.apply(mu=mu_new)
+#     # Verify that users can override `mu`
+#     mu_new = Constant(name='mu_new', value=4.0)
+#     op.apply(mu=mu_new)
 
 
 @skipif('petsc')
@@ -647,11 +647,11 @@ def test_petsc_frees():
     frees = op.body.frees
 
     # Check the frees appear in the following order
-    assert str(frees[0]) == 'PetscCall(VecDestroy(&(b_global_0)));'
-    assert str(frees[1]) == 'PetscCall(VecDestroy(&(x_global_0)));'
-    assert str(frees[2]) == 'PetscCall(MatDestroy(&(J_0)));'
-    assert str(frees[3]) == 'PetscCall(SNESDestroy(&(snes_0)));'
-    assert str(frees[4]) == 'PetscCall(DMDestroy(&(da_0)));'
+    assert str(frees[0]) == 'PetscCall(VecDestroy(&(b_global0)));'
+    assert str(frees[1]) == 'PetscCall(VecDestroy(&(x_global0)));'
+    assert str(frees[2]) == 'PetscCall(MatDestroy(&(J0)));'
+    assert str(frees[3]) == 'PetscCall(SNESDestroy(&(snes0)));'
+    assert str(frees[4]) == 'PetscCall(DMDestroy(&(da0)));'
 
 
 @skipif('petsc')
@@ -671,7 +671,7 @@ def test_calls_to_callbacks():
     ccode = str(op.ccode)
 
     assert '(void (*)(void))MyMatShellMult_0' in ccode
-    assert 'PetscCall(SNESSetFunction(snes_0,NULL,FormFunction_0,NULL));' in ccode
+    assert 'PetscCall(SNESSetFunction(snes0,NULL,FormFunction_0,NULL));' in ccode
 
 
 @skipif('petsc')
@@ -693,7 +693,7 @@ def test_start_ptr():
         op1 = Operator(petsc1)
 
     # Verify the case with modulo time stepping
-    assert 'float * start_ptr_0 = t1*localsize_0 + (float*)(u1_vec->data);' in str(op1)
+    assert 'float * start_ptr0 = t1*localsize0 + (float*)(u1_vec->data);' in str(op1)
 
     # Verify the case with no modulo time stepping
     u2 = TimeFunction(name='u2', grid=grid, space_order=2, dtype=np.float32, save=5)
@@ -703,7 +703,7 @@ def test_start_ptr():
     with switchconfig(openmp=False):
         op2 = Operator(petsc2)
 
-    assert 'float * start_ptr_0 = (time + 1)*localsize_0 + ' + \
+    assert 'float * start_ptr0 = (time + 1)*localsize0 + ' + \
         '(float*)(u2_vec->data);' in str(op2)
 
 

@@ -1,7 +1,8 @@
 from ctypes import POINTER
+import ctypes
 
-from devito.tools import CustomDtype, dtype_to_cstr
-from devito.types import LocalObject, CCompositeObject, ModuloDimension, TimeDimension
+from devito.tools import CustomDtype, dtype_to_cstr, as_tuple
+from devito.types import LocalObject, CCompositeObject, ModuloDimension, TimeDimension, ArrayObject, CustomDimension, PointerArray
 from devito.symbolics import Byref
 
 from devito.petsc.iet.utils import petsc_call
@@ -167,13 +168,36 @@ class DummyArg(LocalObject):
     dtype = CustomDtype('void', modifier='*')
 
 
+class MatReuse(LocalObject):
+    dtype = CustomDtype('MatReuse')
+
+
+class VecScatter(LocalObject):
+    dtype = CustomDtype('VecScatter')
+
+
+class StartPtr(LocalObject):
+    def __init__(self, name, dtype):
+        super().__init__(name=name)
+        self.dtype = CustomDtype(dtype_to_cstr(dtype), modifier=' *')
+
+    
+class SingleIS(LocalObject):
+    """
+    """
+    dtype = CustomDtype('IS')
+
+
+################################################################
+
+
 class PETScStruct(CCompositeObject):
 
     __rargs__ = ('name', 'pname', 'fields')
 
-    def __init__(self, name, pname, fields, liveness='lazy'):
+    def __init__(self, name, pname, fields, modifier=None, liveness='lazy'):
         pfields = [(i._C_name, i._C_ctype) for i in fields]
-        super().__init__(name, pname, pfields, liveness)
+        super().__init__(name, pname, pfields, modifier, liveness)
         self._fields = fields
 
     @property
@@ -197,15 +221,220 @@ class PETScStruct(CCompositeObject):
         """
         return [f for f in self.fields if f not in self.time_dim_fields]
 
-    @property
-    def _C_ctype(self):
-        return POINTER(self.dtype) if self.liveness == \
-            'eager' else self.dtype
+    # TODO: reevaluate this, does it even ever go here?
+    # @property
+    # def _C_ctype(self):
+    #     # from IPython import embed; embed()
+    #     return POINTER(self.dtype) if self.liveness == \
+    #         'eager' else self.dtype
 
     _C_modifier = ' *'
 
+    # TODO: maybe this should move to CCompositeObject itself
+    @property
+    def _fields_(self):
+        return [(i._C_name, i._C_ctype) for i in self.fields]
 
-class StartPtr(LocalObject):
-    def __init__(self, name, dtype):
-        super().__init__(name=name)
-        self.dtype = CustomDtype(dtype_to_cstr(dtype), modifier=' *')
+    # IMPROVE: this is because of the use inside iet/visitors struct decl 
+    @property
+    def __name__(self):
+        return self.pname
+
+
+
+################################### rethink ALL BELOW since they are just ptrs to already exisiting classes e.g Mat *submats....
+# need to be able to index them though etc...
+# TODO may have to re-think this, not sure if quite right -> CREATE A BASE CLASS FOR 
+#  ALL OBJECTS WHICH APPEAR AS A *PTR and then need to be indexed into to destroy them i.e each element of the array
+class IS(ArrayObject):
+    """
+    Index set object used for efficient indexing into vectors and matrices.
+    https://petsc.org/release/manualpages/IS/IS/
+    """
+    _data_alignment = False
+
+    def __init_finalize__(self, *args, **kwargs):
+        self._nindices = kwargs.pop('nindices', ())
+        super().__init_finalize__(*args, **kwargs)
+
+    @classmethod
+    def __indices_setup__(cls, **kwargs):
+        try:
+            return as_tuple(kwargs['dimensions']), as_tuple(kwargs['dimensions'])
+        except KeyError:
+            nindices = kwargs.get('nindices', ())
+            dim = CustomDimension(name='d', symbolic_size=nindices)
+            return (dim,), (dim,)
+
+    @property
+    def dim(self):
+        assert len(self.dimensions) == 1
+        return self.dimensions[0]
+
+    @property
+    def nindices(self):
+        return self._nindices
+
+    @property
+    def dtype(self):
+        return CustomDtype('IS', modifier=' *')
+
+    @property
+    def _C_name(self):
+        return self.name
+
+    @property
+    def _mem_stack(self):
+        return False
+
+    # @property
+    # def _C_ctype(self):
+    #     return ctypes.c_void_p
+
+    @property
+    def _C_free_priority(self):
+        return 0
+
+    @property
+    def _C_free(self):
+        destroy_calls = [
+            petsc_call('ISDestroy', [Byref(self.indexify().subs({self.dim: i}))])
+            for i in range(self._nindices)
+        ]
+        destroy_calls.append(petsc_call('PetscFree', [self.function]))
+        return destroy_calls
+
+
+class SubDM(ArrayObject):
+
+    _data_alignment = False
+
+    def __init_finalize__(self, *args, **kwargs):
+        self._nindices = kwargs.pop('nindices', ())
+        super().__init_finalize__(*args, **kwargs)
+
+    @classmethod
+    def __indices_setup__(cls, **kwargs):
+        try:
+            return as_tuple(kwargs['dimensions']), as_tuple(kwargs['dimensions'])
+        except KeyError:
+            nindices = kwargs.get('nindices', ())
+            dim = CustomDimension(name='d', symbolic_size=nindices)
+            return (dim,), (dim,)
+
+    @property
+    def dim(self):
+        assert len(self.dimensions) == 1
+        return self.dimensions[0]
+
+    @property
+    def nindices(self):
+        return self._nindices
+
+    @property
+    def dtype(self):
+        return CustomDtype('DM', modifier=' *')
+
+    @property
+    def _C_name(self):
+        return self.name
+
+    @property
+    def _mem_stack(self):
+        return False
+
+    @property
+    def _C_free_priority(self):
+        return 0
+
+    # NOTE ADD THE FUNCTIONALITY SO THAT ARRAYOBJECTS CAN BE DESTROYED .. or re-think this class
+    @property
+    def _C_free(self):
+        destroy_calls = [
+            petsc_call('DMDestroy', [Byref(self.indexify().subs({self.dim: i}))])
+            for i in range(self._nindices)
+        ]
+        destroy_calls.append(petsc_call('PetscFree', [self.function]))
+        return destroy_calls
+
+
+
+# class SubMats(ArrayObject):
+
+#     _data_alignment = False
+
+#     def __init_finalize__(self, *args, **kwargs):
+#         self._nindices = kwargs.pop('nindices', ())
+#         super().__init_finalize__(*args, **kwargs)
+
+#     @classmethod
+#     def __indices_setup__(cls, **kwargs):
+#         try:
+#             return as_tuple(kwargs['dimensions']), as_tuple(kwargs['dimensions'])
+#         except KeyError:
+#             nindices = kwargs.get('nindices', ())
+#             dim = CustomDimension(name='d', symbolic_size=nindices)
+#             return (dim,), (dim,)
+
+#     @property
+#     def dim(self):
+#         assert len(self.dimensions) == 1
+#         return self.dimensions[0]
+
+#     _C_modifier = ' *'
+
+#     @property
+#     def nindices(self):
+#         return self._nindices
+
+#     @property
+#     def dtype(self):
+#         return CustomDtype('Mat', modifier=' *')
+
+#     @property
+#     def _C_name(self):
+#         return self.name
+
+#     @property
+#     def _mem_stack(self):
+#         return False
+
+
+class SubMats(ArrayObject):
+    _data_alignment = False
+
+    def __init_finalize__(self, *args, **kwargs):
+        self._nindices = kwargs.pop('nindices', ())
+        super().__init_finalize__(*args, **kwargs)
+
+    @classmethod
+    def __indices_setup__(cls, **kwargs):
+        try:
+            return as_tuple(kwargs['dimensions']), as_tuple(kwargs['dimensions'])
+        except KeyError:
+            nindices = kwargs.get('nindices', ())
+            dim = CustomDimension(name='d', symbolic_size=nindices)
+            return (dim,), (dim,)
+
+    @property
+    def dim(self):
+        assert len(self.dimensions) == 1
+        return self.dimensions[0]
+
+    _C_modifier = ' *'
+
+    @property
+    def nindices(self):
+        return self._nindices
+
+    @property
+    def dtype(self):
+        return CustomDtype('Mat', modifier=' *')
+
+    @property
+    def _C_name(self):
+        return self.name
+
+    @property
+    def _mem_stack(self):
+        return False

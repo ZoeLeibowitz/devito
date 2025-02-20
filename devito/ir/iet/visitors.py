@@ -21,10 +21,10 @@ from devito.symbolics import (FieldFromComposite, FieldFromPointer,
                               ListInitializer, ccode, uxreplace)
 from devito.tools import (GenericVisitor, as_tuple, ctypes_to_cstr, filter_ordered,
                           filter_sorted, flatten, is_external_ctype,
-                          c_restrict_void_p, sorted_priority)
+                          c_restrict_void_p, sorted_priority, CustomDtype)
 from devito.types.basic import AbstractFunction, Basic
 from devito.types import (ArrayObject, CompositeObject, Dimension, Pointer,
-                          IndexedData, DeviceMap)
+                          IndexedData, DeviceMap, CCompositeObject)
 
 
 __all__ = ['FindApplications', 'FindNodes', 'FindSections', 'FindSymbols',
@@ -201,7 +201,13 @@ class CGen(Visitor):
                 return None
         except TypeError:
             # E.g., `ctype` is of type `dtypes_lowering.CustomDtype`
-            return None
+            pass
+
+        if isinstance(ctype, CustomDtype):
+            if isinstance(obj, CCompositeObject):
+                ctype = obj
+            else:
+                return None
 
         try:
             return obj._C_typedecl
@@ -670,8 +676,10 @@ class CGen(Visitor):
 
         # This is essentially to rule out vector types which are declared already
         # in some external headers
-        xfilter = lambda i: (xfilter1(i) and
-                             not is_external_ctype(i._C_ctype, o._includes))
+        # xfilter = lambda i: (xfilter1(i) and
+        #                      not is_external_ctype(i._C_ctype, o._includes))
+
+        xfilter = lambda i: xfilter1(i)
 
         candidates = o.parameters + tuple(o._dspace.parts)
         typedecls = [self._gen_struct_decl(i) for i in candidates if xfilter(i)]
