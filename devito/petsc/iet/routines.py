@@ -963,18 +963,18 @@ class TimeDependent(NonTimeDependent):
     - Modulo dimensions are updated in the matrix context struct at each time
       step and can be accessed in the callback functions where needed.
     """
-    @property
-    def is_target_time(self):
-        return any(i.is_Time for i in self.target.dimensions)
+    # TODO: move these funcs/properties around
+
+    def is_target_time(self, target):
+        return any(i.is_Time for i in target.dimensions)
 
     @property
     def time_spacing(self):
-        return self.target.grid.stepping_dim.spacing
+        return self.injectsolve.expr.rhs.grid.stepping_dim.spacing
 
-    @property
-    def target_time(self):
+    def target_time(self, target):
         target_time = [
-            i for i, d in zip(self.target.indices, self.target.dimensions)
+            i for i, d in zip(target.indices, target.dimensions)
             if d.is_Time
         ]
         assert len(target_time) == 1
@@ -1057,12 +1057,17 @@ class TimeDependent(NonTimeDependent):
                     target_time = self.origin_to_moddim[target_time]
                 except KeyError:
                     pass
+                
+                # TODO: improve this logic, shouldn't need try and except
+                try:
+                    xlocal = solver_objs['xlocal'+target.name]
+                except KeyError:
+                    xlocal = solver_objs['x_local']
 
                 start_ptr = solver_objs[target.name+'_ptr']
-                [target.name+'_ptr']
 
                 vec_get_size = petsc_call(
-                    'VecGetSize', [solver_objs['xlocal'+target.name], Byref(solver_objs['localsize'])]
+                    'VecGetSize', [xlocal, Byref(solver_objs['localsize'])]
                 )
 
                 field_from_ptr = FieldFromPointer(
@@ -1075,10 +1080,9 @@ class TimeDependent(NonTimeDependent):
                 )
 
                 vec_replace_array = petsc_call(
-                    'VecReplaceArray', [solver_objs['xlocal'+target.name], start_ptr]
+                    'VecReplaceArray', [xlocal, start_ptr]
                 )
                 to_replace.extend([vec_get_size, expr, vec_replace_array])
-                # return (vec_get_size, expr, vec_replace_array)
             else:
                 tmp = super().replace_array(solver_objs)
                 to_replace.extend(tmp)

@@ -115,20 +115,20 @@ def test_petsc_solve():
 
     callable_roots = [meta_call.root for meta_call in op._func_table.values()]
 
-    matvec_callback = [root for root in callable_roots if root.name == 'MyMatShellMult_0']
+    matvec_callback = [root for root in callable_roots if root.name == 'MyMatShellMult0']
 
-    formrhs_callback = [root for root in callable_roots if root.name == 'FormRHS_0']
+    formrhs_callback = [root for root in callable_roots if root.name == 'FormRHS0']
 
     action_expr = FindNodes(Expression).visit(matvec_callback[0])
     rhs_expr = FindNodes(Expression).visit(formrhs_callback[0])
 
     assert str(action_expr[-1].expr.rhs) == \
-        'x_matvec_f[x + 1, y + 2]/lctx->h_x**2' + \
-        ' - 2.0*x_matvec_f[x + 2, y + 2]/lctx->h_x**2' + \
-        ' + x_matvec_f[x + 3, y + 2]/lctx->h_x**2' + \
-        ' + x_matvec_f[x + 2, y + 1]/lctx->h_y**2' + \
-        ' - 2.0*x_matvec_f[x + 2, y + 2]/lctx->h_y**2' + \
-        ' + x_matvec_f[x + 2, y + 3]/lctx->h_y**2'
+        'x_matvec_f[x + 1, y + 2]/ctx0->h_x**2' + \
+        ' - 2.0*x_matvec_f[x + 2, y + 2]/ctx0->h_x**2' + \
+        ' + x_matvec_f[x + 3, y + 2]/ctx0->h_x**2' + \
+        ' + x_matvec_f[x + 2, y + 1]/ctx0->h_y**2' + \
+        ' - 2.0*x_matvec_f[x + 2, y + 2]/ctx0->h_y**2' + \
+        ' + x_matvec_f[x + 2, y + 3]/ctx0->h_y**2'
 
     assert str(rhs_expr[-1].expr.rhs) == 'g[x + 2, y + 2]'
 
@@ -222,8 +222,9 @@ def test_LinearSolveExpr():
 
     linsolveexpr = LinearSolveExpr(eqn.rhs, target=f)
 
-    # Check the target
-    assert linsolveexpr.target == f
+    # TODO: maybe expand this test now to check the fielddata etc
+    linsolveexpr = LinearSolveExpr(eqn.rhs)
+
     # Check the solver parameters
     assert linsolveexpr.solver_parameters == \
         {'ksp_type': 'gmres', 'pc_type': 'jacobi', 'ksp_rtol': 1e-05,
@@ -291,8 +292,8 @@ def test_cinterface_petsc_struct():
     assert 'include "%s.h"' % name in ccode
 
     # The public `struct MatContext` only appears in the header file
-    assert 'struct J0_ctx\n{' not in ccode
-    assert 'struct J0_ctx\n{' in hcode
+    assert 'struct UserCtx0\n{' not in ccode
+    assert 'struct UserCtx0\n{' in hcode
 
 
 @skipif('petsc')
@@ -560,14 +561,14 @@ def test_callback_arguments():
     with switchconfig(openmp=False):
         op = Operator(petsc1)
 
-    mv = op._func_table['MyMatShellMult_0'].root
-    ff = op._func_table['FormFunction_0'].root
+    mv = op._func_table['MyMatShellMult0'].root
+    ff = op._func_table['FormFunction0'].root
 
     assert len(mv.parameters) == 3
     assert len(ff.parameters) == 4
 
-    assert str(mv.parameters) == '(J0, X_global0, Y_global0)'
-    assert str(ff.parameters) == '(snes0, X_global0, F_global0, dummy)'
+    assert str(mv.parameters) == '(J0, Xglobal0, Yglobal0)'
+    assert str(ff.parameters) == '(snes0, Xglobal0, Fglobal0, dummy)'
 
 
 @skipif('petsc')
@@ -647,8 +648,8 @@ def test_petsc_frees():
     frees = op.body.frees
 
     # Check the frees appear in the following order
-    assert str(frees[0]) == 'PetscCall(VecDestroy(&(b_global0)));'
-    assert str(frees[1]) == 'PetscCall(VecDestroy(&(x_global0)));'
+    assert str(frees[0]) == 'PetscCall(VecDestroy(&(bglobal0)));'
+    assert str(frees[1]) == 'PetscCall(VecDestroy(&(xglobal0)));'
     assert str(frees[2]) == 'PetscCall(MatDestroy(&(J0)));'
     assert str(frees[3]) == 'PetscCall(SNESDestroy(&(snes0)));'
     assert str(frees[4]) == 'PetscCall(DMDestroy(&(da0)));'
@@ -670,8 +671,8 @@ def test_calls_to_callbacks():
 
     ccode = str(op.ccode)
 
-    assert '(void (*)(void))MyMatShellMult_0' in ccode
-    assert 'PetscCall(SNESSetFunction(snes0,NULL,FormFunction_0,NULL));' in ccode
+    assert '(void (*)(void))MyMatShellMult0' in ccode
+    assert 'PetscCall(SNESSetFunction(snes0,NULL,FormFunction0,NULL));' in ccode
 
 
 @skipif('petsc')
@@ -693,7 +694,7 @@ def test_start_ptr():
         op1 = Operator(petsc1)
 
     # Verify the case with modulo time stepping
-    assert 'float * start_ptr0 = t1*localsize0 + (float*)(u1_vec->data);' in str(op1)
+    assert 'float * u1_ptr0 = t1*localsize0 + (float*)(u1_vec->data);' in str(op1)
 
     # Verify the case with no modulo time stepping
     u2 = TimeFunction(name='u2', grid=grid, space_order=2, dtype=np.float32, save=5)
@@ -703,7 +704,7 @@ def test_start_ptr():
     with switchconfig(openmp=False):
         op2 = Operator(petsc2)
 
-    assert 'float * start_ptr0 = (time + 1)*localsize0 + ' + \
+    assert 'float * u2_ptr0 = (time + 1)*localsize0 + ' + \
         '(float*)(u2_vec->data);' in str(op2)
 
 
@@ -726,12 +727,12 @@ def test_time_loop():
     with switchconfig(openmp=False):
         op1 = Operator(petsc1)
     body1 = str(op1.body)
-    rhs1 = str(op1._func_table['FormRHS_0'].root.ccode)
+    rhs1 = str(op1._func_table['FormRHS0'].root.ccode)
 
     assert 'ctx0.t0 = t0' in body1
     assert 'ctx0.t1 = t1' not in body1
-    assert 'lctx->t0' in rhs1
-    assert 'lctx->t1' not in rhs1
+    assert 'ctx0->t0' in rhs1
+    assert 'ctx0->t1' not in rhs1
 
     # Non-modulo time stepping
     u2 = TimeFunction(name='u2', grid=grid, space_order=2, save=5)
@@ -741,10 +742,10 @@ def test_time_loop():
     with switchconfig(openmp=False):
         op2 = Operator(petsc2)
     body2 = str(op2.body)
-    rhs2 = str(op2._func_table['FormRHS_0'].root.ccode)
+    rhs2 = str(op2._func_table['FormRHS0'].root.ccode)
 
     assert 'ctx0.time = time' in body2
-    assert 'lctx->time' in rhs2
+    assert 'ctx0->time' in rhs2
 
     # Modulo time stepping with more than one time step
     # used in one of the callback functions
@@ -753,12 +754,12 @@ def test_time_loop():
     with switchconfig(openmp=False):
         op3 = Operator(petsc3)
     body3 = str(op3.body)
-    rhs3 = str(op3._func_table['FormRHS_0'].root.ccode)
+    rhs3 = str(op3._func_table['FormRHS0'].root.ccode)
 
     assert 'ctx0.t0 = t0' in body3
     assert 'ctx0.t1 = t1' in body3
-    assert 'lctx->t0' in rhs3
-    assert 'lctx->t1' in rhs3
+    assert 'ctx0->t0' in rhs3
+    assert 'ctx0->t1' in rhs3
 
     # Multiple petsc solves within the same time loop
     v2 = Function(name='v2', grid=grid, space_order=2)
