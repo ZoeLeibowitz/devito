@@ -1123,10 +1123,15 @@ class BaseSetup:
              MatShellSetOp(self.cbbuilder.main_matvec_callback.name, void, void)]
         )
 
+        try:
+            ptr = Byref(sobjs['jacctx'])
+        except KeyError:
+            ptr = VOIDP(sobjs['dmda'])
+
         formfunc_operation = petsc_call(
             'SNESSetFunction',
             [sobjs['snes'], Null,
-             FormFunctionCallback(self.cbbuilder.main_formfunc_callback.name, void, void), VOIDP(sobjs['dmda'])]
+             FormFunctionCallback(self.cbbuilder.main_formfunc_callback.name, void, void), ptr]
         )
 
         dmda_calls = self._create_dmda_calls(dmda)

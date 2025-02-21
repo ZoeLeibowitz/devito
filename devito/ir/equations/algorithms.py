@@ -170,7 +170,8 @@ def concretize_subdims(exprs, **kwargs):
     """
     sregistry = kwargs.get('sregistry')
 
-    mapper = {}
+    # mapper = {}
+    mapper = kwargs.get('concretize_maper', {})
     rebuilt = {}  # Rebuilt implicit dims etc which are shared between dimensions
 
     _concretize_subdims(exprs, mapper, rebuilt, sregistry)
