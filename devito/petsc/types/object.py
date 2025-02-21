@@ -16,13 +16,18 @@ class DM(LocalObject):
     """
     dtype = CustomDtype('DM')
 
-    def __init__(self, *args, stencil_width=None, **kwargs):
+    def __init__(self, *args, stencil_width=None, dofs=1, **kwargs):
         super().__init__(*args, **kwargs)
         self._stencil_width = stencil_width
+        self._dofs = dofs
 
     @property
     def stencil_width(self):
         return self._stencil_width
+
+    @property
+    def dofs(self):
+        return self._dofs
 
     @property
     def _C_free(self):

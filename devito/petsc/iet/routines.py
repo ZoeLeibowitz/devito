@@ -6,7 +6,7 @@ from devito.ir.iet import (Call, FindSymbols, List, Uxreplace, CallableBody,
                            Dereference, DummyExpr, BlankLine, Callable, FindNodes,
                            retrieve_iteration_tree, filter_iterations)
 from devito.symbolics import (Byref, FieldFromPointer, Macro, cast_mapper,
-                              FieldFromComposite)
+                              FieldFromComposite, VOIDP, Cast)
 from devito.symbolics.unevaluation import Mul
 from devito.types.basic import AbstractFunction
 from devito.types import Temp, Symbol
@@ -38,14 +38,15 @@ class CBBuilder:
         self._efuncs = OrderedDict()
         self._struct_params = []
 
-        self._matvec_callback = None
-        self._formfunc_callback = None
-        self._formrhs_callback = None
-        self._struct_callback = None
+        self._main_matvec_callback = None
+        self._main_formfunc_callback = None
+        self._user_struct_callback = None
+        self._matvecs = []
+        self._formfuncs = []
+        self._formrhss = []
 
         self._make_core()
-        self._user_struct()
-        self._make_struct_callback()
+        self._make_user_struct_callback()
         self._efuncs = self._uxreplace_efuncs()
 
     @property
@@ -61,20 +62,33 @@ class CBBuilder:
         return filter_ordered(self.struct_params)
 
     @property
-    def matvec_callback(self):
-        return self._matvec_callback
+    def main_matvec_callback(self):
+        """
+        This is the matvec callback associated with the whole Jacobian i.e
+        is set in the main kernel via
+        `PetscCall(MatShellSetOperation(J,MATOP_MULT,(void (*)(void))MyMatShellMult));`
+        """
+        return self._matvecs.pop()
 
     @property
-    def formfunc_callback(self):
-        return self._formfunc_callback
+    def main_formfunc_callback(self):
+        return self._formfuncs.pop()
 
     @property
-    def formrhs_callback(self):
-        return self._formrhs_callback
+    def matvecs(self):
+        return self._matvecs
 
     @property
-    def struct_callback(self):
-        return self._struct_callback
+    def formfuncs(self):
+        return self._formfuncs
+
+    @property
+    def formrhss(self):
+        return self._formrhss
+
+    @property
+    def user_struct_callback(self):
+        return self._user_struct_callback
 
     def _make_core(self):
         fielddata = self.injectsolve.expr.rhs.fielddata
@@ -98,7 +112,7 @@ class CBBuilder:
                 sobjs['Jac'], sobjs['X_global'], sobjs['Y_global']
             )
         )
-        self._matvec_callback = matvec_callback
+        self._matvecs.append(matvec_callback)
         self._efuncs[matvec_callback.name] = matvec_callback
 
     def _create_matvec_body(self, body, fielddata):
@@ -240,7 +254,7 @@ class CBBuilder:
             parameters=(sobjs['snes'], sobjs['X_global'],
                         sobjs['F_global'], dummyptr)
         )
-        self._formfunc_callback = formfunc_callback
+        self._formfuncs.append(formfunc_callback)
         self._efuncs[formfunc_callback.name] = formfunc_callback
 
     def _create_formfunc_body(self, body, fielddata):
@@ -256,7 +270,13 @@ class CBBuilder:
         f_formfunc = fielddata.arrays['f_formfunc']
         x_formfunc = fielddata.arrays['x_formfunc']
 
-        snes_get_dm = petsc_call('SNESGetDM', [sobjs['snes'], Byref(dmda)])
+        # snes_get_dm = petsc_call('SNESGetDM', [sobjs['snes'], Byref(dmda)])
+
+        # obvs move
+        class DMCast(Cast):
+            _base_typ = 'DM'
+
+        dm_cast = DummyExpr(dmda, DMCast(dummyptr), init=True)
 
         dm_get_app_context = petsc_call(
             'DMGetApplicationContext', [dmda, Byref(dummyctx._C_symbol)]
@@ -326,7 +346,7 @@ class CBBuilder:
         )
 
         stacks = (
-            snes_get_dm,
+            dm_cast,
             dm_get_app_context,
             dm_get_local_xvec,
             global_to_local_begin,
@@ -373,7 +393,7 @@ class CBBuilder:
                 sobjs['callbackdm'], sobjs['b_global'],
             )
         )
-        self._formrhs_callback = formrhs_callback
+        self._formrhss.append(formrhs_callback)
         self._efuncs[formrhs_callback.name] = formrhs_callback
 
     def _create_form_rhs_body(self, body, fielddata):
@@ -478,20 +498,17 @@ class CBBuilder:
             modifier=' *'
         )
 
-    def _user_struct(self):
+    def _make_user_struct_callback(self):
         """
         This is the struct initialised inside the main kernel and
         attached to the DM via DMSetApplicationContext.
         # TODO: this could be common between all PETScSolves instead? 
         """
-        self.solver_objs['userctx'] = petsc_struct(
+        mainctx = self.solver_objs['userctx'] = petsc_struct(
             self.sregistry.make_name(prefix='ctx'),
             self.filtered_struct_params,
             self.sregistry.make_name(prefix='UserCtx'),
         )
-
-    def _make_struct_callback(self):
-        mainctx = self.solver_objs['userctx']
         body = [
             DummyExpr(FieldFromPointer(i._C_symbol, mainctx), i._C_symbol)
             for i in mainctx.callback_fields
@@ -500,13 +517,13 @@ class CBBuilder:
             List(body=body), init=(petsc_func_begin_user,),
             retstmt=tuple([Call('PetscFunctionReturn', arguments=[0])])
         )
-        struct_callback = Callable(
+        cb = Callable(
             self.sregistry.make_name(prefix='PopulateUserContext'),
             struct_callback_body, self.objs['err'],
             parameters=[mainctx]
         )
-        self._efuncs[struct_callback.name] = struct_callback
-        self._struct_callback = struct_callback
+        self._efuncs[cb.name] = cb
+        self._user_struct_callback = cb
 
     def _dummy_fields(self, iet):
         # Place all context data required by the shell routines into a struct
@@ -602,11 +619,11 @@ class BaseObjectBuilder:
                 stencil_width=self.fielddata.space_order
             ),
         }
-        base_dict = self._per_target(base_dict)
+        base_dict = self._target_dependent(base_dict)
         return self._extend_build(base_dict, injectsolve)
 
     # PER TARGET stuff should be moved to the coupled builder I guess
-    def _per_target(self, base_dict):
+    def _target_dependent(self, base_dict):
         sreg = self.sregistry
         targets = self.fielddata.targets
         for target in targets:
@@ -641,6 +658,7 @@ class CoupledObjectBuilder(BaseObjectBuilder):
     """
     Coupled object builder
     """
+    #TODO: override 'dmda' with new dofs per node depdent on no of targets
     pass
 
 
@@ -706,13 +724,13 @@ class BaseSetup:
         matvec_operation = petsc_call(
             'MatShellSetOperation',
             [sobjs['Jac'], 'MATOP_MULT',
-             MatVecCallback(self.cbbuilder.matvec_callback.name, void, void)]
+             MatVecCallback(self.cbbuilder.main_matvec_callback.name, void, void)]
         )
 
         formfunc_operation = petsc_call(
             'SNESSetFunction',
             [sobjs['snes'], Null,
-             FormFunctionCallback(self.cbbuilder.formfunc_callback.name, void, void), Null]
+             FormFunctionCallback(self.cbbuilder.main_formfunc_callback.name, void, void), VOIDP(sobjs['dmda'])]
         )
 
         dmda_calls = self._create_dmda_calls(dmda)
@@ -720,12 +738,13 @@ class BaseSetup:
         mainctx = sobjs['userctx']
 
         call_struct_callback = petsc_call(
-            self.cbbuilder.struct_callback.name, [Byref(mainctx)]
+            self.cbbuilder.user_struct_callback.name, [Byref(mainctx)]
         )
-        calls_set_app_ctx = [
-            petsc_call('DMSetApplicationContext', [dmda, Byref(mainctx)])
-        ]
-        calls = [call_struct_callback] + calls_set_app_ctx + [BlankLine]
+
+        # TODO: check - maybe I don't need to explictly set this
+        mat_set_dm = petsc_call('MatSetDM', [sobjs['Jac'], dmda])
+
+        calls_set_app_ctx = petsc_call('DMSetApplicationContext', [dmda, Byref(mainctx)])
 
         base_setup = dmda_calls + (
             snes_create,
@@ -743,8 +762,11 @@ class BaseSetup:
             ksp_set_from_ops,
             matvec_operation,
             formfunc_operation,
-        ) + tuple(calls)
-
+            call_struct_callback,
+            mat_set_dm,
+            calls_set_app_ctx,
+            BlankLine
+        )
         extended_setup = self._extend_setup()
         return base_setup + tuple(extended_setup)
 
@@ -782,7 +804,7 @@ class BaseSetup:
             args.extend(list(grid.distributor.topology)[::-1])
 
         # Number of degrees of freedom per node
-        args.append(1)
+        args.append(dmda.dofs)
         # "Stencil width" -> size of overlap
         args.append(dmda.stencil_width)
         args.extend([Null]*nspace_dims)
@@ -830,7 +852,7 @@ class Solver:
 
         struct_assignment = self.timedep.assign_time_iters(sobjs['userctx'])
 
-        rhs_callback = self.cbbuilder.formrhs_callback
+        rhs_callback = self.cbbuilder.formrhss.pop()
 
         dmda = sobjs['dmda']
 

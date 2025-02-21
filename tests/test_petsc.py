@@ -672,7 +672,7 @@ def test_calls_to_callbacks():
     ccode = str(op.ccode)
 
     assert '(void (*)(void))MyMatShellMult0' in ccode
-    assert 'PetscCall(SNESSetFunction(snes0,NULL,FormFunction0,NULL));' in ccode
+    assert 'PetscCall(SNESSetFunction(snes0,NULL,FormFunction0,(void*)(da0)));' in ccode
 
 
 @skipif('petsc')
