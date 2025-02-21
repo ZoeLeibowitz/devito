@@ -3,7 +3,7 @@ import ctypes
 
 from devito.tools import CustomDtype, dtype_to_cstr, as_tuple
 from devito.types import LocalObject, CCompositeObject, ModuloDimension, TimeDimension, ArrayObject, CustomDimension, PointerArray
-from devito.symbolics import Byref
+from devito.symbolics import Byref, Cast
 
 from devito.petsc.iet.utils import petsc_call
 
@@ -36,6 +36,10 @@ class DM(LocalObject):
     @property
     def _C_free_priority(self):
         return 4
+
+
+class DMCast(Cast):
+    _base_typ = 'DM'
 
 
 class CallbackDM(LocalObject):
