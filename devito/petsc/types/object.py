@@ -35,7 +35,7 @@ class DM(LocalObject):
 
     @property
     def _C_free_priority(self):
-        return 3
+        return 4
 
 
 class CallbackDM(LocalObject):
@@ -66,7 +66,11 @@ class Mat(LocalObject):
 
     @property
     def _C_free_priority(self):
-        return 1
+        return 2
+
+
+class LocalMat(LocalObject):
+    dtype = CustomDtype('Mat')
 
 
 class LocalVec(LocalObject):
@@ -92,7 +96,7 @@ class GlobalVec(LocalObject):
 
     @property
     def _C_free_priority(self):
-        return 0
+        return 1
 
 
 class PetscMPIInt(LocalObject):
@@ -131,7 +135,7 @@ class SNES(LocalObject):
 
     @property
     def _C_free_priority(self):
-        return 2
+        return 3
 
 
 class PC(LocalObject):
@@ -361,48 +365,6 @@ class SubDM(ArrayObject):
         ]
         destroy_calls.append(petsc_call('PetscFree', [self.function]))
         return destroy_calls
-
-
-
-# class SubMats(ArrayObject):
-
-#     _data_alignment = False
-
-#     def __init_finalize__(self, *args, **kwargs):
-#         self._nindices = kwargs.pop('nindices', ())
-#         super().__init_finalize__(*args, **kwargs)
-
-#     @classmethod
-#     def __indices_setup__(cls, **kwargs):
-#         try:
-#             return as_tuple(kwargs['dimensions']), as_tuple(kwargs['dimensions'])
-#         except KeyError:
-#             nindices = kwargs.get('nindices', ())
-#             dim = CustomDimension(name='d', symbolic_size=nindices)
-#             return (dim,), (dim,)
-
-#     @property
-#     def dim(self):
-#         assert len(self.dimensions) == 1
-#         return self.dimensions[0]
-
-#     _C_modifier = ' *'
-
-#     @property
-#     def nindices(self):
-#         return self._nindices
-
-#     @property
-#     def dtype(self):
-#         return CustomDtype('Mat', modifier=' *')
-
-#     @property
-#     def _C_name(self):
-#         return self.name
-
-#     @property
-#     def _mem_stack(self):
-#         return False
 
 
 class SubMats(ArrayObject):

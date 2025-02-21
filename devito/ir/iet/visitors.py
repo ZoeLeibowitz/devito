@@ -186,7 +186,8 @@ class CGen(Visitor):
         '_mem_constant': 'static',
         '_mem_shared': '',
     }
-    _restrict_keyword = 'restrict'
+    # _restrict_keyword = 'restrict'
+    _restrict_keyword = ''
 
     def _gen_struct_decl(self, obj, masked=()):
         """
@@ -686,7 +687,7 @@ class CGen(Visitor):
         for i in o._func_table.values():
             if not i.local:
                 continue
-            typedecls.extend([self._gen_struct_decl(j) for j in i.root.parameters
+            typedecls.extend([self._gen_struct_decl(j) for j in FindSymbols().visit(i.root)
                               if xfilter(j)])
         typedecls = filter_sorted(typedecls, key=lambda i: i.tpname)
 

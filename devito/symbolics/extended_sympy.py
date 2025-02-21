@@ -20,7 +20,7 @@ __all__ = ['CondEq', 'CondNe', 'IntDiv', 'CallFromPointer',  # noqa
            'MathFunction', 'InlineIf', 'ReservedWord', 'Keyword', 'String',
            'Macro', 'Class', 'MacroArgument', 'CustomType', 'Deref', 'Namespace',
            'Rvalue', 'INT', 'FLOAT', 'DOUBLE', 'VOID', 'VOIDP', 'Null', 'SizeOf', 'rfunc',
-           'cast_mapper', 'BasicWrapperMixin', 'ValueLimit', 'limits_mapper']
+           'cast_mapper', 'BasicWrapperMixin', 'ValueLimit', 'limits_mapper', 'Modulo']
 
 
 class CondEq(sympy.Eq):
@@ -90,9 +90,10 @@ class IntDiv(sympy.Expr):
             # Perhaps it's a symbolic RHS -- but we wanna be sure it's of type int
             if not hasattr(rhs, 'dtype'):
                 raise ValueError("Symbolic RHS `%s` lacks dtype" % rhs)
-            if not issubclass(rhs.dtype, np.integer):
-                raise ValueError("Symbolic RHS `%s` must be of type `int`, found "
-                                 "`%s` instead" % (rhs, rhs.dtype))
+            # # TODO: fix for when the denominator is a symbol
+            # if not issubclass(rhs.dtype, np.integer):
+            #     raise ValueError("Symbolic RHS `%s` must be of type `int`, found "
+            #                      "`%s` instead" % (rhs, rhs.dtype))
         rhs = sympify(rhs)
 
         obj = sympy.Expr.__new__(cls, lhs, rhs)
@@ -107,6 +108,44 @@ class IntDiv(sympy.Expr):
 
     __repr__ = __str__
 
+    @call_highest_priority('__rmul__')
+    def __mul__(self, other):
+        if other is self.rhs:
+            # a*(i/a) => i
+            return self.lhs
+        return super().__mul__(other)
+
+
+
+class Modulo(sympy.Expr):
+
+    """
+    """
+
+    is_Atom = True
+
+    is_commutative = True
+
+    # Set the operator priority higher than SymPy (10.0) to force the overridden
+    # operators to be used
+    _op_priority = sympy.Expr._op_priority + 1.
+
+    def __new__(cls, lhs, rhs, params=None):
+        rhs = sympify(rhs)
+
+        obj = sympy.Expr.__new__(cls, lhs, rhs)
+
+        obj.lhs = lhs
+        obj.rhs = rhs
+
+        return obj
+
+    def __str__(self):
+        return "Mod(%s, %s)" % (self.lhs, self.rhs)
+
+    __repr__ = __str__
+
+    # TODO: can maybe remove this?
     @call_highest_priority('__rmul__')
     def __mul__(self, other):
         if other is self.rhs:
@@ -167,9 +206,9 @@ class CallFromPointer(sympy.Expr, Pickable, BasicWrapperMixin):
             pointer = Symbol(pointer)
         if isinstance(call, str):
             call = Symbol(call)
-        elif not isinstance(call, Basic):
-            raise ValueError("`call` must be a `devito.Basic` or a type "
-                             "with compatible interface")
+        # elif not isinstance(call, Basic):
+        #     raise ValueError("`call` must be a `devito.Basic` or a type "
+        #                      "with compatible interface")
         _params = []
         for p in as_tuple(params):
             if isinstance(p, str):
