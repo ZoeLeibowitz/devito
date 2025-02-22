@@ -159,8 +159,9 @@ class FieldData:
 
 
 class MultipleFieldData(FieldData):
-    def __init__(self):
+    def __init__(self, jacobian=None):
         self.field_data_list = []
+        self._jacobian = jacobian
 
     def add_field_data(self, field_data):
         self.field_data_list.append(field_data)
@@ -200,3 +201,55 @@ class MultipleFieldData(FieldData):
         if len(set(space_orders)) > 1:
             raise ValueError("All targets within a PETScSolve have to have the same space order.")
         return space_orders.pop()
+
+    @property
+    def jacobian(self):
+        return self._jacobian
+
+
+
+class JacobianData:
+    def __init__(self, targets):
+        """
+        Initialize the Jacobian representation.
+        :param targets: List of symbolic field variables.
+        """
+        self.targets = targets
+        self.submatrices = self._initialize_submatrices()
+    
+    def _initialize_submatrices(self):
+        """
+        Create a dictionary of submatrices for each target with metadata.
+        """
+        submatrices = {}
+        num_targets = len(self.targets)
+        
+        for i, target in enumerate(self.targets):
+            submatrices[target] = {}
+            for j in range(num_targets):
+                key = f"J{i}{j}"
+                submatrices[target][key] = {"matvecs": None, "derivative_wrt": self.targets[j]}  # Store metadata
+        
+        return submatrices
+    
+    def set_submatrix(self, field, key, matvecs):
+        """
+        Set a specific submatrix for a field.
+        :param field: The field (target) to which the submatrix belongs.
+        :param key: The submatrix key (e.g., 'J00', 'J01').
+        :param matrix: The actual submatrix value.
+        """
+        if field in self.submatrices and key in self.submatrices[field]:
+            self.submatrices[field][key]["matvecs"] = matvecs
+        else:
+            raise KeyError(f"Invalid field ({field}) or submatrix key ({key})")
+    
+    def get_submatrix(self, field, key):
+        """
+        Retrieve a specific submatrix.
+        """
+        return self.submatrices.get(field, {}).get(key, None)
+    
+    def __repr__(self):
+        """String representation of the Jacobian object."""
+        return str(self.submatrices)

@@ -95,13 +95,14 @@ class CBBuilder:
 
     def _make_core(self):
         fielddata = self.injectsolve.expr.rhs.fielddata
-        self._make_matvec(fielddata)
+        self._make_matvec(fielddata, fielddata.matvecs)
         self._make_formfunc(fielddata)
         self._make_formrhs(fielddata)
 
-    def _make_matvec(self, fielddata):
+    # TODO: probs don't need to pass in fielddata?
+    def _make_matvec(self, fielddata, matvecs, prefix='MatMult'):
         # Compile matvec `eqns` into an IET via recursive compilation
-        matvecs = fielddata.matvecs
+        from IPython import embed; embed()
         sobjs = self.solver_objs
         irs_matvec, _ = self.rcompile(matvecs,
                                       options={'mpi': False}, sregistry=self.sregistry)
@@ -109,7 +110,7 @@ class CBBuilder:
                                                fielddata)
 
         matvec_callback = PETScCallable(
-            self.sregistry.make_name(prefix='MyMatShellMult'), body_matvec,
+            self.sregistry.make_name(prefix=prefix), body_matvec,
             retval=self.objs['err'],
             parameters=(
                 sobjs['Jac'], sobjs['X_global'], sobjs['Y_global']
@@ -573,9 +574,13 @@ class CCBBuilder(CBBuilder):
 
         for t in targets:
             data = all_fielddata.get_field_data(t)
-            self._make_matvec(data)
             self._make_formfunc(data)
             self._make_formrhs(data)
+
+            row_matvecs = all_fielddata.jacobian.submatrices[t]
+            for submat, mtvs in row_matvecs.items():
+                if mtvs['matvecs']:
+                    self._make_matvec(data, mtvs['matvecs'], prefix='%s_MatMult' % submat)
 
     def _make_whole_matvec(self):
         sobjs = self.solver_objs

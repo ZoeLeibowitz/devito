@@ -9,7 +9,7 @@ from devito.types.equation import InjectSolveEq
 from devito.operations.solve import eval_time_derivatives
 from devito.symbolics import retrieve_functions
 from devito.tools import as_tuple, filter_ordered
-from devito.petsc.types import LinearSolveExpr, PETScArray, DMDALocalInfo, FieldData, MultipleFieldData
+from devito.petsc.types import LinearSolveExpr, PETScArray, DMDALocalInfo, FieldData, MultipleFieldData, JacobianData
 
 
 __all__ = ['PETScSolve', 'EssentialBC']
@@ -24,6 +24,7 @@ def PETScSolve(eqns_targets, target=None, solver_parameters=None, **kwargs):
     # If users want segregated solvers, they create multiple PETScSolve objects,
     # rather than passing multiple targets to a single PETScSolve object
     else:
+        # from IPython import embed; embed()
         injectsolve = InjectSolveNested().build(eqns_targets, solver_parameters)
         return injectsolve
 
@@ -44,45 +45,54 @@ class InjectSolve:
         eqns = as_tuple(eqns)
         funcs = get_funcs(eqns)
         time_mapper = generate_time_mapper(funcs)
-        fielddata = self.generate_field_data(eqns, target, time_mapper)
+
+        arrays = self.generate_arrays(target)
+        # jacobian = JacobianData([target])
+        fielddata = self.generate_field_data(eqns, target, time_mapper, arrays)
         return target, tuple(funcs), fielddata, time_mapper
 
-    def generate_field_data(self, eqns, target, time_mapper):
+    def generate_field_data(self, eqns, target, time_mapper, arrays):
         # TODO: change these names
-        # TODO: fielddata needs to extend/change to be a data per submatrix, i.e a list of matvecs, formfuncs, formrhs etc for each submatrix with a label /indexsert identifying it's location in the larger Jacobian
-        prefixes = ['y_matvec', 'x_matvec', 'f_formfunc', 'x_formfunc', 'b_tmp']
+        # TODO: fielddata needs to extend/change to be a data per submatrix, i.e
+        # a list of matvecs, formfuncs, formrhs etc for each submatrix with a
+        # label /indexsert identifying it's location in the larger Jacobian
 
-        arrays = {
-            p: PETScArray(name='%s_%s' % (p, target.name),
-                        target=target,
-                        liveness='eager',
-                        localinfo=localinfo)
-            for p in prefixes
-        }
-
-        matvecs, formfuncs, formrhs = zip(
-            *[self.build_callback_eqns(eq, target, arrays, time_mapper) for eq in eqns]
+        formfuncs, formrhs = zip(
+            *[self.build_function_eqns(eq, target, arrays, time_mapper) for eq in eqns]
         )
 
+        matvecs = [self.build_matvec_eqns(eq, target, arrays, time_mapper) for eq in eqns]
+
+        # from IPython import embed; embed()
+        # jacobian.set_submatrix(target, 'J00')
         # todo, I think the prefixes could be specific to the solve not the fielddata ?
         tmp =  FieldData(
             target=target,
             matvecs=matvecs,
             formfuncs=formfuncs,
             formrhs=formrhs,
-            arrays=arrays,
+            arrays=arrays
         )
         return tmp
 
-    def build_callback_eqns(self, eq, target, arrays, time_mapper):
+    def build_function_eqns(self, eq, target, arrays, time_mapper):
         b, F_target, targets = separate_eqn(eq, target)
         name = target.name
 
-        matvec = self.make_matvec(eq, F_target, arrays, name, targets)
+        # matvec = self.make_matvec(eq, F_target, arrays, name, targets)
         formfunc = self.make_formfunc(eq, F_target, arrays, name, targets)
         formrhs = self.make_rhs(eq, b, arrays, name)
 
-        return tuple(expr.subs(time_mapper) for expr in (matvec, formfunc, formrhs))
+        return tuple(expr.subs(time_mapper) for expr in (formfunc, formrhs))
+
+    def build_matvec_eqns(self, eq, target, arrays, time_mapper):
+        b, F_target, targets = separate_eqn(eq, target)
+        name = target.name
+        # from IPython import embed; embed()
+        if not F_target:
+            return None
+        matvec = self.make_matvec(eq, F_target, arrays, name, targets)
+        return matvec.subs(time_mapper)
 
     def make_matvec(self, eq, F_target, arrays, name, targets):
         if isinstance(eq, EssentialBC):
@@ -122,6 +132,19 @@ class InjectSolve:
                 subdomain=eq.subdomain
             )
 
+    def generate_arrays(self, target):
+        prefixes = ['y_matvec', 'x_matvec', 'f_formfunc', 'x_formfunc', 'b_tmp']
+
+        arrays = {
+            p: PETScArray(name='%s_%s' % (p, target.name),
+                        target=target,
+                        liveness='eager',
+                        localinfo=localinfo)
+            for p in prefixes
+        }
+        return arrays
+
+
 
 class InjectSolveNested(InjectSolve):
     def build_eq(self, eqns_targets, solver_parameters):
@@ -129,14 +152,56 @@ class InjectSolveNested(InjectSolve):
         funcs = get_funcs(combined_eqns)
         time_mapper = generate_time_mapper(funcs)
 
-        all_data = MultipleFieldData()
+        targets = list(eqns_targets.keys())
+        jacobian = JacobianData(targets)
+
+        all_data = MultipleFieldData(jacobian)
+        # from IPython import embed; embed()
 
         for target, eqns in eqns_targets.items():
+            other_targets = [t for t in list(eqns_targets.keys()) if t is not target]
             eqns = as_tuple(eqns)
-            fielddata = self.generate_field_data(eqns, target, time_mapper)
+            arrays = self.generate_arrays(target)
+            # fielddata = self.build_jac_row(eqns, target, time_mapper, arrays, jacobian, other_targets)
+            # from IPython import embed; embed()
+            fielddata = self.generate_field_data_nested(eqns, target, time_mapper, arrays, jacobian)
             all_data.add_field_data(fielddata)
 
         return target, tuple(funcs), all_data, time_mapper
+
+    def generate_field_data_nested(self, eqns, target, time_mapper, arrays, jacobian):
+        # TODO: change these names
+        # TODO: fielddata needs to extend/change to be a data per submatrix, i.e
+        # a list of matvecs, formfuncs, formrhs etc for each submatrix with a
+        # label /indexsert identifying it's location in the larger Jacobian
+
+        formfuncs, formrhs = zip(
+            *[self.build_function_eqns(eq, target, arrays, time_mapper) for eq in eqns]
+        )
+
+        # matvecs = [self.build_matvec_eqns(eq, target, arrays, time_mapper) for eq in eqns]
+        # from IPython import embed; embed()
+        for submat, mtvs in jacobian.submatrices[target].items():
+            # instead of target, you would use the 'derivative_wrt' or something
+            deriv = mtvs['derivative_wrt']
+            # from IPython import embed; embed()
+            matvecs = [self.build_matvec_eqns(eq, deriv, arrays, time_mapper) for eq in eqns]
+            # TODO: improve
+            if any(m is not None for m in matvecs):
+                jacobian.set_submatrix(target, submat, matvecs)
+
+        # from IPython import embed; embed()
+        # jacobian.set_submatrix(target, 'J00')
+        # todo, I think the prefixes could be specific to the solve not the fielddata ?
+        tmp =  FieldData(
+            target=target,
+            formfuncs=formfuncs,
+            formrhs=formrhs,
+            arrays=arrays
+        )
+        return tmp
+
+
 
 
 class EssentialBC(Eq):
