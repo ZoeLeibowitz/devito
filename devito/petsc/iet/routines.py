@@ -648,31 +648,34 @@ class CCBBuilder(CBBuilder):
         sobjs = self.solver_objs
 
         # TODO: replace obvs
-        tmp = c.Line("struct JacobianCtx * jctx0 = (struct JacobianCtx *)dummy;")
-
+        ljacctx = sobjs['ljacctx']
+        struct_cast = DummyExpr(ljacctx, StructCast(dummyptr))
+        # tmp = c.Line("struct JacobianCtx * jctx0 = (struct JacobianCtx *)dummy;")
+        # from IPython import embed; embed()
+        # ljacctx = sobjs['ljacctx']
         # TODO: rethink since matrices sjhouldn;t be used at all here
 
         # J00
-        deref_j00 = DummyExpr(sobjs['J00'], FieldFromPointer(sobjs['submats'].indexed[0], sobjs['jacctx']))
-        mat_get_dm_j00 = petsc_call('MatGetDM', [sobjs['J00'], Byref(sobjs['dmpn1'])])
-        mat_get_ctx_j00 = petsc_call('MatShellGetContext', [sobjs['J00'], Byref(sobjs['J00ctx'])])
-        vec_get_x_j00 = petsc_call('VecGetSubVector', [sobjs['X_global'], Deref(FieldFromPointer(cols.base, sobjs['J00ctx'])), Byref(sobjs['J00X'])])
-        vec_get_y_j00 = petsc_call('VecGetSubVector', [sobjs['F_global'], Deref(FieldFromPointer(rows.base, sobjs['J00ctx'])), Byref(sobjs['J00F'])])
-        call_first_formfunc = petsc_call(self.formfuncs[0].name, [sobjs['snes'], sobjs['J00X'], sobjs['J00F'], VOIDP(sobjs['dmpn1'])])
-        vec_restore_x_j00 = petsc_call('VecRestoreSubVector', [sobjs['X_global'], Deref(FieldFromPointer(cols.base, sobjs['J00ctx'])), Byref(sobjs['J00X'])])
-        vec_restore_y_j00 = petsc_call('VecRestoreSubVector', [sobjs['F_global'], Deref(FieldFromPointer(rows.base, sobjs['J00ctx'])), Byref(sobjs['J00F'])])
+        # deref_j00 = DummyExpr(sobjs['J00'], FieldFromPointer(sobjs['submats'].indexed[0], sobjs['jacctx']))
+        # mat_get_dm_j00 = petsc_call('MatGetDM', [sobjs['J00'], Byref(sobjs['dmpn1'])])
+        # mat_get_ctx_j00 = petsc_call('MatShellGetContext', [sobjs['J00'], Byref(sobjs['J00ctx'])])
+        vec_get_x_j00 = petsc_call('VecGetSubVector', [sobjs['X_global'], FieldFromPointer(Fields.indexed[0], ljacctx), Byref(sobjs['J00X'])])
+        vec_get_y_j00 = petsc_call('VecGetSubVector', [sobjs['F_global'],  FieldFromPointer(Fields.indexed[0], ljacctx), Byref(sobjs['J00F'])])
+        call_first_formfunc = petsc_call(self.formfuncs[0].name, [sobjs['snes'], sobjs['J00X'], sobjs['J00F'], VOIDP( FieldFromPointer(Subdms.indexed[0], ljacctx))])
+        vec_restore_x_j00 = petsc_call('VecRestoreSubVector', [sobjs['X_global'],  FieldFromPointer(Fields.indexed[0], ljacctx), Byref(sobjs['J00X'])])
+        vec_restore_y_j00 = petsc_call('VecRestoreSubVector', [sobjs['F_global'],  FieldFromPointer(Fields.indexed[0], ljacctx), Byref(sobjs['J00F'])])
 
         # J11
-        deref_j11 = DummyExpr(sobjs['J11'], FieldFromPointer(sobjs['submats'].indexed[3], sobjs['jacctx']))
-        mat_get_dm_j11 = petsc_call('MatGetDM', [sobjs['J11'], Byref(sobjs['dmpn2'])])
-        mat_get_ctx_j11 = petsc_call('MatShellGetContext', [sobjs['J11'], Byref(sobjs['J11ctx'])])
-        vec_get_x_j11 = petsc_call('VecGetSubVector', [sobjs['X_global'], Deref(FieldFromPointer(cols.base, sobjs['J11ctx'])), Byref(sobjs['J11X'])])
-        vec_get_y_j11 = petsc_call('VecGetSubVector', [sobjs['F_global'], Deref(FieldFromPointer(rows.base, sobjs['J11ctx'])), Byref(sobjs['J11F'])])
-        call_second_formfunc = petsc_call(self.formfuncs[1].name, [sobjs['snes'], sobjs['J11X'], sobjs['J11F'], VOIDP(sobjs['dmpn2'])])
-        vec_restore_x_j11 = petsc_call('VecRestoreSubVector', [sobjs['X_global'], Deref(FieldFromPointer(cols.base, sobjs['J11ctx'])), Byref(sobjs['J11X'])])
-        vec_restore_y_j11 = petsc_call('VecRestoreSubVector', [sobjs['F_global'], Deref(FieldFromPointer(rows.base, sobjs['J11ctx'])), Byref(sobjs['J11F'])])
+        # deref_j11 = DummyExpr(sobjs['J11'], FieldFromPointer(sobjs['submats'].indexed[3], sobjs['jacctx']))
+        # mat_get_dm_j11 = petsc_call('MatGetDM', [sobjs['J11'], Byref(sobjs['dmpn2'])])
+        # mat_get_ctx_j11 = petsc_call('MatShellGetContext', [sobjs['J11'], Byref(sobjs['J11ctx'])])
+        vec_get_x_j11 = petsc_call('VecGetSubVector', [sobjs['X_global'],  FieldFromPointer(Fields.indexed[1], ljacctx), Byref(sobjs['J11X'])])
+        vec_get_y_j11 = petsc_call('VecGetSubVector', [sobjs['F_global'],  FieldFromPointer(Fields.indexed[1], ljacctx), Byref(sobjs['J11F'])])
+        call_second_formfunc = petsc_call(self.formfuncs[1].name, [sobjs['snes'], sobjs['J11X'], sobjs['J11F'], VOIDP( FieldFromPointer(Subdms.indexed[1], ljacctx))])
+        vec_restore_x_j11 = petsc_call('VecRestoreSubVector', [sobjs['X_global'], FieldFromPointer(Fields.indexed[1], ljacctx), Byref(sobjs['J11X'])])
+        vec_restore_y_j11 = petsc_call('VecRestoreSubVector', [sobjs['F_global'], FieldFromPointer(Fields.indexed[1], ljacctx), Byref(sobjs['J11F'])])
 
-        body = [tmp, BlankLine, deref_j00, mat_get_dm_j00, mat_get_ctx_j00, vec_get_x_j00, vec_get_y_j00, call_first_formfunc, vec_restore_x_j00, vec_restore_y_j00,  BlankLine, deref_j11, mat_get_dm_j11, mat_get_ctx_j11, vec_get_x_j11, vec_get_y_j11, call_second_formfunc, vec_restore_x_j11, vec_restore_y_j11]
+        body = [struct_cast, BlankLine, vec_get_x_j00, vec_get_y_j00, call_first_formfunc, vec_restore_x_j00, vec_restore_y_j00,  BlankLine, vec_get_x_j11, vec_get_y_j11, call_second_formfunc, vec_restore_x_j11, vec_restore_y_j11]
 
         body = CallableBody(
             List(body=tuple(body)),
@@ -1644,6 +1647,10 @@ Null = Macro('NULL')
 void = 'void'
 dummyctx = Symbol('lctx')
 dummyptr = DummyArg('dummy')
+
+# TODO: obvs generalise and improve..should probs use caststar?
+class StructCast(Cast):
+    _base_typ = 'struct JacobianCtx *'
 
 # SubMatrixCtx struct members
 rows = IS(name='rows', nindices=1)
