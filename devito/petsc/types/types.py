@@ -208,7 +208,7 @@ class MultipleFieldData(FieldData):
 
 
 
-class JacobianData:
+class SubMatrices:
     def __init__(self, targets):
         """
         Initialize the Jacobian representation.
@@ -228,9 +228,18 @@ class JacobianData:
             submatrices[target] = {}
             for j in range(num_targets):
                 key = f"J{i}{j}"
-                submatrices[target][key] = {"matvecs": None, "derivative_wrt": self.targets[j]}  # Store metadata
+                submatrices[target][key] = {
+                    "matvecs": None,
+                    "derivative_wrt": self.targets[j],
+                    "index": i * num_targets + j
+                }  # Store metadata
         
         return submatrices
+
+    @property
+    def submatrix_keys(self):
+        """Return a list of all submatrix keys (e.g., ['J00', 'J01', 'J10', 'J11'])."""
+        return [key for submats in self.submatrices.values() for key in submats.keys()]
     
     def set_submatrix(self, field, key, matvecs):
         """

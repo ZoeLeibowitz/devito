@@ -9,7 +9,7 @@ from devito.types.equation import InjectSolveEq
 from devito.operations.solve import eval_time_derivatives
 from devito.symbolics import retrieve_functions
 from devito.tools import as_tuple, filter_ordered
-from devito.petsc.types import LinearSolveExpr, PETScArray, DMDALocalInfo, FieldData, MultipleFieldData, JacobianData
+from devito.petsc.types import LinearSolveExpr, PETScArray, DMDALocalInfo, FieldData, MultipleFieldData, SubMatrices
 
 
 __all__ = ['PETScSolve', 'EssentialBC']
@@ -47,7 +47,6 @@ class InjectSolve:
         time_mapper = generate_time_mapper(funcs)
 
         arrays = self.generate_arrays(target)
-        # jacobian = JacobianData([target])
         fielddata = self.generate_field_data(eqns, target, time_mapper, arrays)
         return target, tuple(funcs), fielddata, time_mapper
 
@@ -153,7 +152,7 @@ class InjectSolveNested(InjectSolve):
         time_mapper = generate_time_mapper(funcs)
 
         targets = list(eqns_targets.keys())
-        jacobian = JacobianData(targets)
+        jacobian = SubMatrices(targets)
 
         all_data = MultipleFieldData(jacobian)
         # from IPython import embed; embed()

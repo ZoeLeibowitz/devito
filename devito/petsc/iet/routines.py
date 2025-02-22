@@ -102,7 +102,7 @@ class CBBuilder:
     # TODO: probs don't need to pass in fielddata?
     def _make_matvec(self, fielddata, matvecs, prefix='MatMult'):
         # Compile matvec `eqns` into an IET via recursive compilation
-        from IPython import embed; embed()
+        # from IPython import embed; embed()
         sobjs = self.solver_objs
         irs_matvec, _ = self.rcompile(matvecs,
                                       options={'mpi': False}, sregistry=self.sregistry)
@@ -605,21 +605,21 @@ class CCBBuilder(CBBuilder):
 
         # J00
         deref_j00 = DummyExpr(sobjs['J00'], FieldFromPointer(sobjs['submats'].indexed[0], sobjs['ljacctx']))
-        mat_get_ctx_j00 = petsc_call('MatShellGetContext', [sobjs['J00'], Byref(sobjs['j00ctx'])])
-        vec_get_x_j00 = petsc_call('VecGetSubVector', [sobjs['X_global'], Deref(FieldFromPointer(cols.base, sobjs['j00ctx'])), Byref(sobjs['j00X'])])
-        vec_get_y_j00 = petsc_call('VecGetSubVector', [sobjs['Y_global'], Deref(FieldFromPointer(rows.base, sobjs['j00ctx'])), Byref(sobjs['j00Y'])])
-        mat_mult_j00 = petsc_call('MatMult', [sobjs['J00'], sobjs['j00X'], sobjs['j00Y']])
-        vec_restore_x_j00 = petsc_call('VecRestoreSubVector', [sobjs['X_global'], Deref(FieldFromPointer(cols.base, sobjs['j00ctx'])), Byref(sobjs['j00X'])])
-        vec_restore_y_j00 = petsc_call('VecRestoreSubVector', [sobjs['Y_global'], Deref(FieldFromPointer(rows.base, sobjs['j00ctx'])), Byref(sobjs['j00Y'])])
+        mat_get_ctx_j00 = petsc_call('MatShellGetContext', [sobjs['J00'], Byref(sobjs['J00ctx'])])
+        vec_get_x_j00 = petsc_call('VecGetSubVector', [sobjs['X_global'], Deref(FieldFromPointer(cols.base, sobjs['J00ctx'])), Byref(sobjs['J00X'])])
+        vec_get_y_j00 = petsc_call('VecGetSubVector', [sobjs['Y_global'], Deref(FieldFromPointer(rows.base, sobjs['J00ctx'])), Byref(sobjs['J00Y'])])
+        mat_mult_j00 = petsc_call('MatMult', [sobjs['J00'], sobjs['J00X'], sobjs['J00Y']])
+        vec_restore_x_j00 = petsc_call('VecRestoreSubVector', [sobjs['X_global'], Deref(FieldFromPointer(cols.base, sobjs['J00ctx'])), Byref(sobjs['J00X'])])
+        vec_restore_y_j00 = petsc_call('VecRestoreSubVector', [sobjs['Y_global'], Deref(FieldFromPointer(rows.base, sobjs['J00ctx'])), Byref(sobjs['J00Y'])])
 
         # J11
         deref_j11 = DummyExpr(sobjs['J11'], FieldFromPointer(sobjs['submats'].indexed[3], sobjs['ljacctx']))
-        mat_get_ctx_j11 = petsc_call('MatShellGetContext', [sobjs['J11'], Byref(sobjs['j11ctx'])])
-        vec_get_x_j11 = petsc_call('VecGetSubVector', [sobjs['X_global'], Deref(FieldFromPointer(cols.base, sobjs['j11ctx'])), Byref(sobjs['j11X'])])
-        vec_get_y_j11 = petsc_call('VecGetSubVector', [sobjs['Y_global'], Deref(FieldFromPointer(rows.base, sobjs['j11ctx'])), Byref(sobjs['j11Y'])])
-        mat_mult_j11 = petsc_call('MatMult', [sobjs['J11'], sobjs['j11X'], sobjs['j11Y']])
-        vec_restore_x_j11 = petsc_call('VecRestoreSubVector', [sobjs['X_global'], Deref(FieldFromPointer(cols.base, sobjs['j11ctx'])), Byref(sobjs['j11X'])])
-        vec_restore_y_j11 = petsc_call('VecRestoreSubVector', [sobjs['Y_global'], Deref(FieldFromPointer(rows.base, sobjs['j11ctx'])), Byref(sobjs['j11Y'])])
+        mat_get_ctx_j11 = petsc_call('MatShellGetContext', [sobjs['J11'], Byref(sobjs['J11ctx'])])
+        vec_get_x_j11 = petsc_call('VecGetSubVector', [sobjs['X_global'], Deref(FieldFromPointer(cols.base, sobjs['J11ctx'])), Byref(sobjs['J11X'])])
+        vec_get_y_j11 = petsc_call('VecGetSubVector', [sobjs['Y_global'], Deref(FieldFromPointer(rows.base, sobjs['J11ctx'])), Byref(sobjs['J11Y'])])
+        mat_mult_j11 = petsc_call('MatMult', [sobjs['J11'], sobjs['J11X'], sobjs['J11Y']])
+        vec_restore_x_j11 = petsc_call('VecRestoreSubVector', [sobjs['X_global'], Deref(FieldFromPointer(cols.base, sobjs['J11ctx'])), Byref(sobjs['J11X'])])
+        vec_restore_y_j11 = petsc_call('VecRestoreSubVector', [sobjs['Y_global'], Deref(FieldFromPointer(rows.base, sobjs['J11ctx'])), Byref(sobjs['J11Y'])])
 
         body = [mat_get_ctx_main, BlankLine, deref_j00, mat_get_ctx_j00, vec_get_x_j00, vec_get_y_j00, mat_mult_j00, vec_restore_x_j00, vec_restore_y_j00,  BlankLine, deref_j11, mat_get_ctx_j11, vec_get_x_j11, vec_get_y_j11, mat_mult_j11, vec_restore_x_j11, vec_restore_y_j11]
         body = CallableBody(
@@ -647,27 +647,30 @@ class CCBBuilder(CBBuilder):
     def _create_whole_formfunc_callback_body(self):
         sobjs = self.solver_objs
 
+        # TODO: replace obvs
         tmp = c.Line("struct JacobianCtx * jctx0 = (struct JacobianCtx *)dummy;")
+
+        # TODO: rethink since matrices sjhouldn;t be used at all here
 
         # J00
         deref_j00 = DummyExpr(sobjs['J00'], FieldFromPointer(sobjs['submats'].indexed[0], sobjs['jacctx']))
         mat_get_dm_j00 = petsc_call('MatGetDM', [sobjs['J00'], Byref(sobjs['dmpn1'])])
-        mat_get_ctx_j00 = petsc_call('MatShellGetContext', [sobjs['J00'], Byref(sobjs['j00ctx'])])
-        vec_get_x_j00 = petsc_call('VecGetSubVector', [sobjs['X_global'], Deref(FieldFromPointer(cols.base, sobjs['j00ctx'])), Byref(sobjs['j00X'])])
-        vec_get_y_j00 = petsc_call('VecGetSubVector', [sobjs['F_global'], Deref(FieldFromPointer(rows.base, sobjs['j00ctx'])), Byref(sobjs['j00F'])])
-        call_first_formfunc = petsc_call(self.formfuncs[0].name, [sobjs['snes'], sobjs['j00X'], sobjs['j00F'], VOIDP(sobjs['dmpn1'])])
-        vec_restore_x_j00 = petsc_call('VecRestoreSubVector', [sobjs['X_global'], Deref(FieldFromPointer(cols.base, sobjs['j00ctx'])), Byref(sobjs['j00X'])])
-        vec_restore_y_j00 = petsc_call('VecRestoreSubVector', [sobjs['F_global'], Deref(FieldFromPointer(rows.base, sobjs['j00ctx'])), Byref(sobjs['j00F'])])
+        mat_get_ctx_j00 = petsc_call('MatShellGetContext', [sobjs['J00'], Byref(sobjs['J00ctx'])])
+        vec_get_x_j00 = petsc_call('VecGetSubVector', [sobjs['X_global'], Deref(FieldFromPointer(cols.base, sobjs['J00ctx'])), Byref(sobjs['J00X'])])
+        vec_get_y_j00 = petsc_call('VecGetSubVector', [sobjs['F_global'], Deref(FieldFromPointer(rows.base, sobjs['J00ctx'])), Byref(sobjs['J00F'])])
+        call_first_formfunc = petsc_call(self.formfuncs[0].name, [sobjs['snes'], sobjs['J00X'], sobjs['J00F'], VOIDP(sobjs['dmpn1'])])
+        vec_restore_x_j00 = petsc_call('VecRestoreSubVector', [sobjs['X_global'], Deref(FieldFromPointer(cols.base, sobjs['J00ctx'])), Byref(sobjs['J00X'])])
+        vec_restore_y_j00 = petsc_call('VecRestoreSubVector', [sobjs['F_global'], Deref(FieldFromPointer(rows.base, sobjs['J00ctx'])), Byref(sobjs['J00F'])])
 
         # J11
         deref_j11 = DummyExpr(sobjs['J11'], FieldFromPointer(sobjs['submats'].indexed[3], sobjs['jacctx']))
         mat_get_dm_j11 = petsc_call('MatGetDM', [sobjs['J11'], Byref(sobjs['dmpn2'])])
-        mat_get_ctx_j11 = petsc_call('MatShellGetContext', [sobjs['J11'], Byref(sobjs['j11ctx'])])
-        vec_get_x_j11 = petsc_call('VecGetSubVector', [sobjs['X_global'], Deref(FieldFromPointer(cols.base, sobjs['j11ctx'])), Byref(sobjs['j11X'])])
-        vec_get_y_j11 = petsc_call('VecGetSubVector', [sobjs['F_global'], Deref(FieldFromPointer(rows.base, sobjs['j11ctx'])), Byref(sobjs['j11F'])])
-        call_second_formfunc = petsc_call(self.formfuncs[1].name, [sobjs['snes'], sobjs['j11X'], sobjs['j11F'], VOIDP(sobjs['dmpn2'])])
-        vec_restore_x_j11 = petsc_call('VecRestoreSubVector', [sobjs['X_global'], Deref(FieldFromPointer(cols.base, sobjs['j11ctx'])), Byref(sobjs['j11X'])])
-        vec_restore_y_j11 = petsc_call('VecRestoreSubVector', [sobjs['F_global'], Deref(FieldFromPointer(rows.base, sobjs['j11ctx'])), Byref(sobjs['j11F'])])
+        mat_get_ctx_j11 = petsc_call('MatShellGetContext', [sobjs['J11'], Byref(sobjs['J11ctx'])])
+        vec_get_x_j11 = petsc_call('VecGetSubVector', [sobjs['X_global'], Deref(FieldFromPointer(cols.base, sobjs['J11ctx'])), Byref(sobjs['J11X'])])
+        vec_get_y_j11 = petsc_call('VecGetSubVector', [sobjs['F_global'], Deref(FieldFromPointer(rows.base, sobjs['J11ctx'])), Byref(sobjs['J11F'])])
+        call_second_formfunc = petsc_call(self.formfuncs[1].name, [sobjs['snes'], sobjs['J11X'], sobjs['J11F'], VOIDP(sobjs['dmpn2'])])
+        vec_restore_x_j11 = petsc_call('VecRestoreSubVector', [sobjs['X_global'], Deref(FieldFromPointer(cols.base, sobjs['J11ctx'])), Byref(sobjs['J11X'])])
+        vec_restore_y_j11 = petsc_call('VecRestoreSubVector', [sobjs['F_global'], Deref(FieldFromPointer(rows.base, sobjs['J11ctx'])), Byref(sobjs['J11F'])])
 
         body = [tmp, BlankLine, deref_j00, mat_get_dm_j00, mat_get_ctx_j00, vec_get_x_j00, vec_get_y_j00, call_first_formfunc, vec_restore_x_j00, vec_restore_y_j00,  BlankLine, deref_j11, mat_get_dm_j11, mat_get_ctx_j11, vec_get_x_j11, vec_get_y_j11, call_second_formfunc, vec_restore_x_j11, vec_restore_y_j11]
 
@@ -903,7 +906,8 @@ class CoupledObjectBuilder(BaseObjectBuilder):
     def _extend_build(self, base_dict, injectsolve):
         sreg = self.sregistry
         # TODO: add a no_of_targets attribute to the FieldData object
-        no_targets = len(self.fielddata.targets)
+        targets = self.fielddata.targets
+        no_targets = len(targets)
 
         base_dict['fields'] = IS(
             name=sreg.make_name(prefix='fields'), nindices=no_targets
@@ -935,11 +939,8 @@ class CoupledObjectBuilder(BaseObjectBuilder):
         base_dict['all_IS_rows'] = IS(name=sreg.make_name(prefix='allrows'), nindices=1)
         base_dict['all_IS_cols'] = IS(name=sreg.make_name(prefix='allcols'), nindices=1)
 
-        base_dict['J00'] = Mat(name='J00')
-        base_dict['J11'] = Mat(name='J11')
-
-        # probably can just use the existing 'callbackdm'
-        base_dict['subdm'] = DM(sreg.make_name(prefix='subdm'), liveness='eager')
+        jacobian = injectsolve.expr.rhs.fielddata.jacobian
+        submatrix_keys = jacobian.submatrix_keys
 
         pname = 'SubMatrixCtx'
         fields = [rows, cols]
@@ -950,36 +951,31 @@ class CoupledObjectBuilder(BaseObjectBuilder):
             modifier=' *', liveness='eager'
         )
 
-        base_dict['j00ctx'] = petsc_struct(
-            name='j00ctx', pname=pname,
-            fields=fields, modifier=' *', liveness='eager'
-        )
+        for key in submatrix_keys:
+            base_dict[key] = Mat(name=key)
 
-        base_dict['j11ctx'] = petsc_struct(
-            name='j11ctx', pname=pname,
-            fields=fields, modifier=' *', liveness='eager'
-        )
+            base_dict[key+'ctx'] = petsc_struct(
+                name=key+'ctx', pname=pname,
+                fields=fields, modifier=' *', liveness='eager'
+            )
+
+            # not sure if it should be global or local yet
+            base_dict[key+'X'] = LocalVec(sreg.make_name(prefix=key+'X'))
+            base_dict[key+'Y'] = LocalVec(sreg.make_name(prefix=key+'Y'))
+            base_dict[key+'F'] = LocalVec(sreg.make_name(prefix=key+'F'))
+
+        # probably can just use the existing 'callbackdm'
+        base_dict['subdm'] = DM(sreg.make_name(prefix='subdm'), liveness='eager')
 
         base_dict['row_idx'] = PetscInt(sreg.make_name(prefix='rowidx'))
         base_dict['col_idx'] = PetscInt(self.sregistry.make_name(prefix='colidx'))
 
-        # not sure if it should be global or local yet
-        base_dict['j00X'] = LocalVec(sreg.make_name(prefix='j00X'))
-        base_dict['j00Y'] = LocalVec(sreg.make_name(prefix='j00Y'))
-        base_dict['j00F'] = LocalVec(sreg.make_name(prefix='j00F'))
-
-        base_dict['j11X'] = LocalVec(sreg.make_name(prefix='j11X'))
-        base_dict['j11Y'] = LocalVec(sreg.make_name(prefix='j11Y'))
-        base_dict['j11F'] = LocalVec(sreg.make_name(prefix='j11F'))
-
         base_dict['matreuse'] = MatReuse(sreg.make_name(prefix='scall'))
 
         # obvs rethink -> probs don't need?
-        base_dict['dmpn1'] = CallbackDM(sreg.make_name(prefix='dmpn1'), liveness='eager')
-        base_dict['dmpn2'] = CallbackDM(sreg.make_name(prefix='dmpn2'), liveness='eager')
-
-        base_dict['scatterpn1'] = VecScatter(sreg.make_name(prefix='scatterpn1'))
-        base_dict['scatterpn2'] = VecScatter(sreg.make_name(prefix='scatterpn2'))
+        for t in targets:
+            base_dict['dm%s'%t.name] = CallbackDM(sreg.make_name(prefix='dm%s'%t.name), liveness='eager')
+            base_dict['scatter%s'%t.name] = VecScatter(sreg.make_name(prefix='scatter%s'%t.name))
 
         return base_dict
 
