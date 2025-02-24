@@ -70,6 +70,8 @@ class LocalVec(LocalObject):
     PETSc local vector object (Vec).
     A local vector has ghost locations that contain values that are
     owned by other MPI ranks.
+    This type is also used for Vec objects used inside callback functions, which
+    do not want to be destroyed.
     """
     dtype = CustomDtype('Vec')
 
