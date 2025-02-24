@@ -152,18 +152,15 @@ class InjectSolveNested(InjectSolve):
         time_mapper = generate_time_mapper(funcs)
 
         targets = list(eqns_targets.keys())
-        jacobian = SubMatrices(targets)
+        submatrices = SubMatrices(targets)
 
-        all_data = MultipleFieldData(jacobian)
-        # from IPython import embed; embed()
+        all_data = MultipleFieldData(submatrices)
 
         for target, eqns in eqns_targets.items():
             other_targets = [t for t in list(eqns_targets.keys()) if t is not target]
             eqns = as_tuple(eqns)
             arrays = self.generate_arrays(target)
-            # fielddata = self.build_jac_row(eqns, target, time_mapper, arrays, jacobian, other_targets)
-            # from IPython import embed; embed()
-            fielddata = self.generate_field_data_nested(eqns, target, time_mapper, arrays, jacobian)
+            fielddata = self.generate_field_data_nested(eqns, target, time_mapper, arrays, submatrices)
             all_data.add_field_data(fielddata)
 
         return target, tuple(funcs), all_data, time_mapper
@@ -178,8 +175,6 @@ class InjectSolveNested(InjectSolve):
             *[self.build_function_eqns(eq, target, arrays, time_mapper) for eq in eqns]
         )
 
-        # matvecs = [self.build_matvec_eqns(eq, target, arrays, time_mapper) for eq in eqns]
-        # from IPython import embed; embed()
         for submat, mtvs in jacobian.submatrices[target].items():
             # instead of target, you would use the 'derivative_wrt' or something
             deriv = mtvs['derivative_wrt']

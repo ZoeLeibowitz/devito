@@ -197,6 +197,7 @@ void = 'void'
 petsc_func_begin_user = c.Line('PetscFunctionBeginUser;')
 
 
+# TODO: these objects shouldn't be duplicated -> use the ones created inside routines.py 
 # JacMatrixCtx struct members
 Subdms = SubDM(name='subdms', nindices=1)
 Fields = IS(name='fields', nindices=1)

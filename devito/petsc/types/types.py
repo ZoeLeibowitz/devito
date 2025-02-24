@@ -159,9 +159,9 @@ class FieldData:
 
 
 class MultipleFieldData(FieldData):
-    def __init__(self, jacobian=None):
+    def __init__(self, submatrices=None):
         self.field_data_list = []
-        self._jacobian = jacobian
+        self._submatrices = submatrices
 
     def add_field_data(self, field_data):
         self.field_data_list.append(field_data)
@@ -203,8 +203,8 @@ class MultipleFieldData(FieldData):
         return space_orders.pop()
 
     @property
-    def jacobian(self):
-        return self._jacobian
+    def submatrices(self):
+        return self._submatrices
 
 
 
@@ -240,6 +240,25 @@ class SubMatrices:
     def submatrix_keys(self):
         """Return a list of all submatrix keys (e.g., ['J00', 'J01', 'J10', 'J11'])."""
         return [key for submats in self.submatrices.values() for key in submats.keys()]
+
+    @property
+    def nonzero_submatrix_keys(self):
+        """Return a list of submats where 'matvecs' is not None."""
+        return [
+            key
+            for submats in self.submatrices.values()
+            for key, value in submats.items()
+            if value["matvecs"] is not None
+        ]
+
+    @property
+    def submat_to_index(self):
+        """Return a dictionary mapping submatrix keys to their index."""
+        return {
+            key: value["index"]
+            for submats in self.submatrices.values()
+            for key, value in submats.items()
+        }
     
     def set_submatrix(self, field, key, matvecs):
         """

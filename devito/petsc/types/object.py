@@ -16,14 +16,14 @@ class DM(LocalObject):
     """
     dtype = CustomDtype('DM')
 
-    def __init__(self, *args, stencil_width=None, dofs=1, **kwargs):
+    def __init__(self, *args, dofs=1, **kwargs):
         super().__init__(*args, **kwargs)
-        self._stencil_width = stencil_width
+        # self._stencil_width = stencil_width
         self._dofs = dofs
 
-    @property
-    def stencil_width(self):
-        return self._stencil_width
+    # @property
+    # def stencil_width(self):
+    #     return self._stencil_width
 
     @property
     def dofs(self):
@@ -82,6 +82,8 @@ class LocalVec(LocalObject):
     PETSc local vector object (Vec).
     A local vector has ghost locations that contain values that are
     owned by other MPI ranks.
+    This type is also used for Vec objects used inside callback functions, which
+    do not want to be destroyed.
     """
     dtype = CustomDtype('Vec')
 
@@ -259,7 +261,7 @@ class PETScStruct(CCompositeObject):
 # need to be able to index them though etc...
 # TODO may have to re-think this, not sure if quite right -> CREATE A BASE CLASS FOR 
 #  ALL OBJECTS WHICH APPEAR AS A *PTR and then need to be indexed into to destroy them i.e each element of the array
-class IS(ArrayObject):
+class LocalIS(ArrayObject):
     """
     Index set object used for efficient indexing into vectors and matrices.
     https://petsc.org/release/manualpages/IS/IS/
@@ -308,6 +310,17 @@ class IS(ArrayObject):
     def _C_free_priority(self):
         return 0
 
+    # @property
+    # def _C_free(self):
+    #     destroy_calls = [
+    #         petsc_call('ISDestroy', [Byref(self.indexify().subs({self.dim: i}))])
+    #         for i in range(self._nindices)
+    #     ]
+    #     destroy_calls.append(petsc_call('PetscFree', [self.function]))
+    #     return destroy_calls
+
+
+class IS(LocalIS):
     @property
     def _C_free(self):
         destroy_calls = [
@@ -318,7 +331,8 @@ class IS(ArrayObject):
         return destroy_calls
 
 
-class SubDM(ArrayObject):
+
+class LocalSubDMs(ArrayObject):
 
     _data_alignment = False
 
@@ -360,6 +374,18 @@ class SubDM(ArrayObject):
     def _C_free_priority(self):
         return 0
 
+    # # NOTE ADD THE FUNCTIONALITY SO THAT ARRAYOBJECTS CAN BE DESTROYED .. or re-think this class
+    # @property
+    # def _C_free(self):
+    #     destroy_calls = [
+    #         petsc_call('DMDestroy', [Byref(self.indexify().subs({self.dim: i}))])
+    #         for i in range(self._nindices)
+    #     ]
+    #     destroy_calls.append(petsc_call('PetscFree', [self.function]))
+    #     return destroy_calls
+
+
+class SubDM(LocalSubDMs):
     # NOTE ADD THE FUNCTIONALITY SO THAT ARRAYOBJECTS CAN BE DESTROYED .. or re-think this class
     @property
     def _C_free(self):
