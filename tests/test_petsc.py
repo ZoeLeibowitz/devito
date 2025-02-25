@@ -115,7 +115,7 @@ def test_petsc_solve():
 
     callable_roots = [meta_call.root for meta_call in op._func_table.values()]
 
-    matvec_callback = [root for root in callable_roots if root.name == 'MyMatShellMult0']
+    matvec_callback = [root for root in callable_roots if root.name == 'MatMult0']
 
     formrhs_callback = [root for root in callable_roots if root.name == 'FormRHS0']
 
@@ -561,14 +561,14 @@ def test_callback_arguments():
     with switchconfig(openmp=False):
         op = Operator(petsc1)
 
-    mv = op._func_table['MyMatShellMult0'].root
+    mv = op._func_table['MatMult0'].root
     ff = op._func_table['FormFunction0'].root
 
     assert len(mv.parameters) == 3
     assert len(ff.parameters) == 4
 
-    assert str(mv.parameters) == '(J0, Xglobal0, Yglobal0)'
-    assert str(ff.parameters) == '(snes0, Xglobal0, Fglobal0, dummy)'
+    assert str(mv.parameters) == '(J, X, Y)'
+    assert str(ff.parameters) == '(snes, X, F, dummy)'
 
 
 @skipif('petsc')
@@ -604,31 +604,31 @@ def test_petsc_struct():
     assert all(not isinstance(i, CCompositeObject) for i in op.parameters)
 
 
-# @skipif('petsc')
-# @pytest.mark.parallel(mode=[2, 4, 8])
-# def test_apply(mode):
+@skipif('petsc')
+@pytest.mark.parallel(mode=[2, 4, 8])
+def test_apply(mode):
 
-#     grid = Grid(shape=(13, 13), dtype=np.float64)
+    grid = Grid(shape=(13, 13), dtype=np.float64)
 
-#     pn = Function(name='pn', grid=grid, space_order=2, dtype=np.float64)
-#     rhs = Function(name='rhs', grid=grid, space_order=2, dtype=np.float64)
-#     mu = Constant(name='mu', value=2.0)
+    pn = Function(name='pn', grid=grid, space_order=2, dtype=np.float64)
+    rhs = Function(name='rhs', grid=grid, space_order=2, dtype=np.float64)
+    mu = Constant(name='mu', value=2.0)
 
-#     eqn = Eq(pn.laplace*mu, rhs, subdomain=grid.interior)
+    eqn = Eq(pn.laplace*mu, rhs, subdomain=grid.interior)
 
-#     petsc = PETScSolve(eqn, pn)
+    petsc = PETScSolve(eqn, pn)
 
-#     # Build the op
-#     with switchconfig(openmp=False, mpi=True):
-#         op = Operator(petsc)
+    # Build the op
+    with switchconfig(openmp=False, mpi=True):
+        op = Operator(petsc)
 
-#     # Check the Operator runs without errors. Not verifying output for
-#     # now. Need to consolidate BC implementation
-#     op.apply()
+    # Check the Operator runs without errors. Not verifying output for
+    # now. Need to consolidate BC implementation
+    op.apply()
 
-#     # Verify that users can override `mu`
-#     mu_new = Constant(name='mu_new', value=4.0)
-#     op.apply(mu=mu_new)
+    # Verify that users can override `mu`
+    mu_new = Constant(name='mu_new', value=4.0)
+    op.apply(mu=mu_new)
 
 
 @skipif('petsc')
@@ -671,7 +671,7 @@ def test_calls_to_callbacks():
 
     ccode = str(op.ccode)
 
-    assert '(void (*)(void))MyMatShellMult0' in ccode
+    assert '(void (*)(void))MatMult0' in ccode
     assert 'PetscCall(SNESSetFunction(snes0,NULL,FormFunction0,(void*)(da0)));' in ccode
 
 

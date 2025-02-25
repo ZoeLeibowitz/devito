@@ -256,6 +256,11 @@ class PETScStruct(CCompositeObject):
         return self.pname
 
 
+# TODO: obvs generalise and improve..should probs use caststar?
+class StructCast(Cast):
+    _base_typ = 'struct JacobianCtx *'
+
+
 
 ################################### rethink ALL BELOW since they are just ptrs to already exisiting classes e.g Mat *submats....
 # need to be able to index them though etc...
@@ -269,7 +274,7 @@ class LocalIS(ArrayObject):
     _data_alignment = False
 
     def __init_finalize__(self, *args, **kwargs):
-        self._nindices = kwargs.pop('nindices', ())
+        self._nindices = kwargs.pop('nindices', 1)
         super().__init_finalize__(*args, **kwargs)
 
     @classmethod
@@ -277,7 +282,7 @@ class LocalIS(ArrayObject):
         try:
             return as_tuple(kwargs['dimensions']), as_tuple(kwargs['dimensions'])
         except KeyError:
-            nindices = kwargs.get('nindices', ())
+            nindices = kwargs.get('nindices', 1)
             dim = CustomDimension(name='d', symbolic_size=nindices)
             return (dim,), (dim,)
 
@@ -337,7 +342,7 @@ class LocalSubDMs(ArrayObject):
     _data_alignment = False
 
     def __init_finalize__(self, *args, **kwargs):
-        self._nindices = kwargs.pop('nindices', ())
+        self._nindices = kwargs.pop('nindices', 1)
         super().__init_finalize__(*args, **kwargs)
 
     @classmethod
@@ -345,7 +350,7 @@ class LocalSubDMs(ArrayObject):
         try:
             return as_tuple(kwargs['dimensions']), as_tuple(kwargs['dimensions'])
         except KeyError:
-            nindices = kwargs.get('nindices', ())
+            nindices = kwargs.get('nindices', 1)
             dim = CustomDimension(name='d', symbolic_size=nindices)
             return (dim,), (dim,)
 
@@ -401,7 +406,7 @@ class SubMats(ArrayObject):
     _data_alignment = False
 
     def __init_finalize__(self, *args, **kwargs):
-        self._nindices = kwargs.pop('nindices', ())
+        self._nindices = kwargs.pop('nindices', 1)
         super().__init_finalize__(*args, **kwargs)
 
     @classmethod
@@ -409,7 +414,7 @@ class SubMats(ArrayObject):
         try:
             return as_tuple(kwargs['dimensions']), as_tuple(kwargs['dimensions'])
         except KeyError:
-            nindices = kwargs.get('nindices', ())
+            nindices = kwargs.get('nindices', 1)
             dim = CustomDimension(name='d', symbolic_size=nindices)
             return (dim,), (dim,)
 
