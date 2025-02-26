@@ -973,6 +973,7 @@ class CoupledObjectBuilder(BaseObjectBuilder):
             base_dict[f'scatter{name}'] = VecScatter(
                 sreg.make_name(prefix=f'scatter{name}')
             )
+
         return base_dict
 
 
@@ -1204,7 +1205,6 @@ class CoupledSetup(BaseSetup):
             shell_set_ctx,
             create_submats
         ) + tuple(deref_dms) + tuple(xglobals) + tuple(bglobals)
-
 
 class Solver:
     def __init__(self, **kwargs):
