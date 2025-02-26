@@ -236,10 +236,14 @@ class SubMatrices:
                     'index': i * num_targets + j
                 }
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 =======
         
 >>>>>>> 3b77b8944 (compiler: Re-write init for Builder)
+=======
+
+>>>>>>> f46491c98 (flake8)
         return submatrices
 
     @property
@@ -289,11 +293,7 @@ class SubMatrices:
             self.submatrices[field][key]["matvecs"] = matvecs
         else:
             raise KeyError(f'Invalid field ({field}) or submatrix key ({key})')
-<<<<<<< HEAD
 
-=======
-    
->>>>>>> 3b77b8944 (compiler: Re-write init for Builder)
     def get_submatrix(self, field, key):
         """
         Retrieve a specific submatrix.
