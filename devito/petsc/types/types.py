@@ -235,7 +235,11 @@ class SubMatrices:
                     'derivative_wrt': self.targets[j],
                     'index': i * num_targets + j
                 }
+<<<<<<< HEAD
 
+=======
+        
+>>>>>>> 3b77b8944 (compiler: Re-write init for Builder)
         return submatrices
 
     @property
@@ -285,7 +289,11 @@ class SubMatrices:
             self.submatrices[field][key]["matvecs"] = matvecs
         else:
             raise KeyError(f'Invalid field ({field}) or submatrix key ({key})')
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 3b77b8944 (compiler: Re-write init for Builder)
     def get_submatrix(self, field, key):
         """
         Retrieve a specific submatrix.
