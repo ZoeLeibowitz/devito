@@ -114,12 +114,6 @@ def build_core_objects(grid, **kwargs):
         'err': PetscErrorCode(name='err'),
         'grid': grid,
 
-        'Null': Macro('NULL'),
-        'dummyctx': Symbol('lctx'),
-        'dummyptr': DummyArg('dummy'),
-        'dummyefunc': Symbol('dummyefunc'),
-        'dof': PetscInt('dof'),
-
         # Matrices & Vectors
         'block': LocalMat('block'),
         'submat_arr': SubMats(name='submat_arr'),
@@ -174,6 +168,12 @@ def build_core_objects(grid, **kwargs):
             fields=[subdms, fields], liveness='lazy'
         ),
 
+        'Null': Macro('NULL'),
+        'dummyctx': Symbol('lctx'),
+        'dummyptr': DummyArg('dummy'),
+        'dummyefunc': Symbol('dummyefunc'),
+        'dof': PetscInt('dof'),
+
         # PETSc Function Begin
         'petsc_func_begin_user': c.Line('PetscFunctionBeginUser;'),
     }
@@ -189,62 +189,63 @@ class Builder:
     depending on the properties of `injectsolve`.
     """
     def __init__(self, injectsolve, objs, iters, **kwargs):
+        self.injectsolve = injectsolve
+        self.objs = objs
+        self.iters = iters
+        self.kwargs = kwargs
 
-        # Determine the time dependency class
-        time_mapper = injectsolve.expr.rhs.time_mapper
-        timedep = TimeDependent if time_mapper else NonTimeDependent
-        self.timedep = timedep(injectsolve, iters, **kwargs)
+        self.coupled = isinstance(injectsolve.expr.rhs.fielddata, MultipleFieldData)
 
-        # TODO: obvs improve this
-        if isinstance(injectsolve.expr.rhs.fielddata, MultipleFieldData):
-            coupled = True
-        else:
-            coupled = False
+        self.objbuilder = self._object_builder()
+        self.timedep = self._time_dependency()
+        self.cbbuilder = self._callback_builder()
+        self.solversetup = self._setup()
+        self.solve = self._solver_execution()
 
-        # Objects
-        if coupled:
-            self.objbuilder = CoupledObjectBuilder(injectsolve, objs, **kwargs)
-        else:
-            self.objbuilder = BaseObjectBuilder(injectsolve, objs, **kwargs)
-        self.solver_objs = self.objbuilder.solver_objs
+    def _object_builder(self):
+        args = (self.injectsolve, self.objs)
+        return (
+            CoupledObjectBuilder(*args, **self.kwargs)
+            if self.coupled else
+            BaseObjectBuilder(*args, **self.kwargs)
+        )
 
-        # Callbacks
-        if coupled:
-            self.cbbuilder = CCBBuilder(
-                injectsolve, objs, self.solver_objs, timedep=self.timedep,
-                **kwargs
-            )
-        else:
-            self.cbbuilder = CBBuilder(
-                injectsolve, objs, self.solver_objs, timedep=self.timedep,
-                **kwargs
-            )
+    def _time_dependency(self):
+        time_mapper = self.injectsolve.expr.rhs.time_mapper
+        timedep_class = TimeDependent if time_mapper else NonTimeDependent
+        return timedep_class(
+            self.injectsolve, self.iters, self.objbuilder.solver_objs, **self.kwargs
+        )
 
-        if coupled:
-            # Solver setup
-            self.solversetup = CoupledSetup(
-                self.solver_objs, objs, injectsolve, self.cbbuilder
-            )
-        else:
-            self.solversetup = BaseSetup(
-                self.solver_objs, objs, injectsolve, self.cbbuilder
-            )
+    def _callback_builder(self):
+        sobjs = self.objbuilder.solver_objs
+        args = (self.injectsolve, self.objs, sobjs, self.timedep)
+        return (
+            CCBBuilder(*args, **self.kwargs)
+            if self.coupled else
+            CBBuilder(*args, **self.kwargs)
+        )
 
-        # NOTE: might not acc need a separate coupled class for this->rethink
-        # just addding one for the purposes of debugging and figuring
-        # out the coupled abstraction
-        if coupled:
-            # Execute the solver
-            self.solve = CoupledSolver(
-                self.solver_objs, objs, injectsolve, iters,
-                self.cbbuilder, timedep=self.timedep
-            )
-        else:
-            # Execute the solver
-            self.solve = Solver(
-                self.solver_objs, objs, injectsolve, iters,
-                self.cbbuilder, timedep=self.timedep
-            )
+    def _setup(self):
+        sobjs = self.objbuilder.solver_objs
+        args = (self.injectsolve, self.objs, sobjs, self.cbbuilder)
+        return (
+            CoupledSetup(*args, **self.kwargs)
+            if self.coupled else
+            BaseSetup(*args, **self.kwargs)
+        )
+
+    def _solver_execution(self):
+        sobjs = self.objbuilder.solver_objs
+        args = (
+            self.injectsolve, self.objs, sobjs,
+            self.iters, self.cbbuilder, self.timedep
+        )
+        return (
+            CoupledSolver(*args)
+            if self.coupled else
+            Solver(*args)
+        )
 
 
 def populate_matrix_context(efuncs, objs):

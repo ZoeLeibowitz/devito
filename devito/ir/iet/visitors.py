@@ -676,8 +676,8 @@ class CGen(Visitor):
 
         # This is essentially to rule out vector types which are declared already
         # in some external headers
-        # xfilter = lambda i: (xfilter1(i) and
-        #                      not is_external_ctype(i._C_ctype, o._includes))
+        xfilter = lambda i: (xfilter1(i) and
+                             not is_external_ctype(i._C_ctype, o._includes))
 
         xfilter = lambda i: xfilter1(i)
 
@@ -686,8 +686,11 @@ class CGen(Visitor):
         for i in o._func_table.values():
             if not i.local:
                 continue
-            typedecls.extend([self._gen_struct_decl(j) for j in FindSymbols().visit(i.root)
-                              if xfilter(j)])
+            typedecls.extend([
+                self._gen_struct_decl(j)
+                for j in FindSymbols().visit(i.root)
+                if xfilter(j)
+            ])
         typedecls = filter_sorted(typedecls, key=lambda i: i.tpname)
 
         return typedecls

@@ -24,8 +24,8 @@ class CBBuilder:
     """
     Build IET routines to generate PETSc callback functions.
     """
-    def __init__(self, injectsolve, objs, solver_objs,
-                 rcompile=None, sregistry=None, timedep=None, **kwargs):
+    def __init__(self, injectsolve, objs, solver_objs, timedep,
+                 rcompile=None, sregistry=None, **kwargs):
 
         self.rcompile = rcompile
         self.sregistry = sregistry
@@ -532,10 +532,10 @@ class CBBuilder:
 
 
 class CCBBuilder(CBBuilder):
-    def __init__(self, injectsolve, objs, solver_objs, **kwargs):
+    def __init__(self, injectsolve, objs, solver_objs, timedep, **kwargs):
         # TODO: probs move this after the super init?
         self._submatrices_callback = None
-        super().__init__(injectsolve, objs, solver_objs, **kwargs)
+        super().__init__(injectsolve, objs, solver_objs, timedep, **kwargs)
         # TODO: re-think -> should probs move inside makecore?
         self._make_coupled_ctx()
         self._make_whole_matvec()
@@ -932,7 +932,7 @@ class BaseObjectBuilder:
         sreg = self.sregistry
         targets = self.fielddata.targets
         for target in targets:
-            base_dict[target.name+'_ptr'] = StartPtr(
+            base_dict[f'{target.name}_ptr'] = StartPtr(
                 sreg.make_name(prefix=f'{target.name}_ptr'), target.dtype
             )
         base_dict = self._extend_target_dependent(base_dict)
@@ -1049,10 +1049,10 @@ class CoupledObjectBuilder(BaseObjectBuilder):
 
 
 class BaseSetup:
-    def __init__(self, solver_objs, objs, injectsolve, cbbuilder):
-        self.solver_objs = solver_objs
-        self.objs = objs
+    def __init__(self, injectsolve, objs, solver_objs, cbbuilder, **kwargs):
         self.injectsolve = injectsolve
+        self.objs = objs
+        self.solver_objs = solver_objs
         self.cbbuilder = cbbuilder
         self.calls = self._setup()
 
@@ -1281,11 +1281,11 @@ class CoupledSetup(BaseSetup):
 
 
 class Solver:
-    def __init__(self, solver_objs, objs, injectsolve, iters, cbbuilder,
-                 timedep=None, **kwargs):
-        self.solver_objs = solver_objs
-        self.objs = objs
+    def __init__(self, injectsolve, objs, solver_objs, iters, cbbuilder,
+                 timedep, **kwargs):
         self.injectsolve = injectsolve
+        self.objs = objs
+        self.solver_objs = solver_objs
         self.iters = iters
         self.cbbuilder = cbbuilder
         self.timedep = timedep
@@ -1316,7 +1316,7 @@ class Solver:
         local_x = petsc_call('DMCreateLocalVector',
                              [dmda, Byref(sobjs['x_local'])])
 
-        vec_replace_array = self.timedep.replace_array(target, sobjs)
+        vec_replace_array = self.timedep.replace_array(target)
 
         dm_local_to_global_x = petsc_call(
             'DMLocalToGlobal', [dmda, sobjs['x_local'], insert_vals,
@@ -1384,7 +1384,7 @@ class CoupledSolver(Solver):
             pre_solve += (
                 petsc_call(c.name, [dm, target_bglob]),
                 petsc_call('DMCreateLocalVector', [dm, Byref(target_xloc)]),
-                self.timedep.replace_array(t, sobjs),
+                self.timedep.replace_array(t),
                 petsc_call(
                     'DMLocalToGlobal',
                     [dm, target_xloc, insert_vals, target_xglob]
@@ -1440,18 +1440,13 @@ class CoupledSolver(Solver):
 
 
 class NonTimeDependent:
-    def __init__(self, injectsolve, iters, **kwargs):
+    def __init__(self, injectsolve, iters, solver_objs, **kwargs):
         self.injectsolve = injectsolve
         self.iters = iters
+        self.sobjs = solver_objs
         self.kwargs = kwargs
         self.origin_to_moddim = self._origin_to_moddim_mapper(iters)
         self.time_idx_to_symb = injectsolve.expr.rhs.time_mapper
-
-    # @property
-    # TODO: for coupled solves, could have a case where one function is a TimeFunction
-    # but the other is a Function, but they both depend on time.
-    # def targets(self):
-    #     return self.injectsolve.expr.rhs.fielddata.targets
 
     def _origin_to_moddim_mapper(self, iters):
         return {}
@@ -1459,7 +1454,7 @@ class NonTimeDependent:
     def uxreplace_time(self, body):
         return body
 
-    def replace_array(self, target, solver_objs):
+    def replace_array(self, target):
         """
         TODO: UPDATE DOCS
         VecReplaceArray() is a PETSc function that allows replacing the array
@@ -1478,14 +1473,15 @@ class NonTimeDependent:
         PetscCall(VecReplaceArray(x_local_0,f1_vec->data));
         """
         to_replace = []
+        sobjs = self.sobjs
 
         field_from_ptr = FieldFromPointer(
             target.function._C_field_data, target.function._C_symbol
         )
         try:
-            xlocal = solver_objs['xlocal'+target.name]
+            xlocal = sobjs[f'xlocal{target.name}']
         except KeyError:
-            xlocal = solver_objs['x_local']
+            xlocal = sobjs['x_local']
 
         vec_replace_array = (petsc_call(
             'VecReplaceArray', [xlocal, field_from_ptr]
@@ -1585,7 +1581,7 @@ class TimeDependent(NonTimeDependent):
                     mapper[d] = d
         return mapper
 
-    def replace_array(self, target, solver_objs):
+    def replace_array(self, target):
         """
         In the case that the actual target is time-dependent e.g a `TimeFunction`,
         a pointer to the first element in the array that will be updated during
@@ -1610,6 +1606,8 @@ class TimeDependent(NonTimeDependent):
         """
         # TODO: improve this
         to_replace = []
+        sobjs = self.sobjs
+
         if self.is_target_time(target):
             mapper = {self.time_spacing: 1, -self.time_spacing: -1}
             target_time = self.target_time(target).xreplace(mapper)
@@ -1620,14 +1618,14 @@ class TimeDependent(NonTimeDependent):
                 pass
             # TODO: improve this logic, shouldn't need try and except
             try:
-                xlocal = solver_objs['xlocal'+target.name]
+                xlocal = sobjs[f'xlocal{target.name}']
             except KeyError:
-                xlocal = solver_objs['x_local']
+                xlocal = sobjs['x_local']
 
-            start_ptr = solver_objs[target.name+'_ptr']
+            start_ptr = sobjs[f'{target.name}_ptr']
 
             vec_get_size = petsc_call(
-                'VecGetSize', [xlocal, Byref(solver_objs['localsize'])]
+                'VecGetSize', [xlocal, Byref(sobjs['localsize'])]
             )
 
             field_from_ptr = FieldFromPointer(
@@ -1636,7 +1634,7 @@ class TimeDependent(NonTimeDependent):
 
             expr = DummyExpr(
                 start_ptr, cast_mapper[(target.dtype, '*')](field_from_ptr) +
-                Mul(target_time, solver_objs['localsize']), init=True
+                Mul(target_time, sobjs['localsize']), init=True
             )
 
             vec_replace_array = petsc_call(
@@ -1644,7 +1642,7 @@ class TimeDependent(NonTimeDependent):
             )
             to_replace.extend([vec_get_size, expr, vec_replace_array])
         else:
-            tmp = super().replace_array(target, solver_objs)
+            tmp = super().replace_array(target)
             to_replace.extend(tmp)
         return tuple(to_replace)
 

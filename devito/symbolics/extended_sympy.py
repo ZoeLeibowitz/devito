@@ -12,7 +12,6 @@ from devito.tools import (Pickable, Bunch, as_tuple, is_integer, float2,  # noqa
                           float3, float4, double2, double3, double4, int2, int3,
                           int4)
 from devito.types import Symbol
-from devito.types.basic import Basic
 
 __all__ = ['CondEq', 'CondNe', 'IntDiv', 'CallFromPointer',  # noqa
            'CallFromComposite', 'FieldFromPointer', 'FieldFromComposite',
@@ -116,12 +115,9 @@ class IntDiv(sympy.Expr):
         return super().__mul__(other)
 
 
-
 class Modulo(sympy.Expr):
-
     """
     """
-
     is_Atom = True
 
     is_commutative = True

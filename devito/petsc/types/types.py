@@ -190,16 +190,23 @@ class MultipleFieldData(FieldData):
     def grid(self):
         grids = [t.grid for t in self.targets]
         if len(set(grids)) > 1:
-            raise ValueError("All targets within a PETScSolve have to have the same grid.")
+            raise ValueError(
+                "All targets within a PETScSolve have to have the same grid."
+            )
         return grids.pop()
 
     @property
     def space_order(self):
-        # NOTE: since we use DMDA to create vecs for the coupled solves, all fields must have the same space order
-        # ... re think this? could be a limitation. For now, just force the space order to be the same
+        # NOTE: since we use DMDA to create vecs for the coupled solves,
+        # all fields must have the same space order
+        # ... re think this? limitation. For now, just force the
+        # space order to be the same.
+        # This isn't a problem for segregated solves.
         space_orders = [t.space_order for t in self.targets]
         if len(set(space_orders)) > 1:
-            raise ValueError("All targets within a PETScSolve have to have the same space order.")
+            raise ValueError(
+                "All targets within a PETScSolve have to have the same space order."
+            )
         return space_orders.pop()
 
     @property
@@ -207,77 +214,83 @@ class MultipleFieldData(FieldData):
         return self._submatrices
 
 
-
 class SubMatrices:
     def __init__(self, targets):
-        """
-        Initialize the Jacobian representation.
-        :param targets: List of symbolic field variables.
-        """
         self.targets = targets
         self.submatrices = self._initialize_submatrices()
-    
+
     def _initialize_submatrices(self):
         """
-        Create a dictionary of submatrices for each target with metadata.
+        Create a dict of submatrices for each target with metadata.
         """
         submatrices = {}
         num_targets = len(self.targets)
-        
+
         for i, target in enumerate(self.targets):
             submatrices[target] = {}
             for j in range(num_targets):
-                key = f"J{i}{j}"
+                key = f'J{i}{j}'
                 submatrices[target][key] = {
-                    "matvecs": None,
-                    "derivative_wrt": self.targets[j],
-                    "index": i * num_targets + j
-                }  # Store metadata
-        
+                    'matvecs': None,
+                    'derivative_wrt': self.targets[j],
+                    'index': i * num_targets + j
+                }
+
         return submatrices
 
     @property
     def submatrix_keys(self):
-        """Return a list of all submatrix keys (e.g., ['J00', 'J01', 'J10', 'J11'])."""
+        """
+        Return a list of all submatrix keys (e.g., ['J00', 'J01', 'J10', 'J11']).
+        """
         return [key for submats in self.submatrices.values() for key in submats.keys()]
 
     @property
     def nonzero_submatrix_keys(self):
-        """Return a list of submats where 'matvecs' is not None."""
+        """
+        Returns a list of submats where 'matvecs' is not None.
+        """
         return [
             key
             for submats in self.submatrices.values()
             for key, value in submats.items()
-            if value["matvecs"] is not None
+            if value['matvecs'] is not None
         ]
 
     @property
     def submat_to_index(self):
-        """Return a dictionary mapping submatrix keys to their index."""
+        """
+        Returns a dict mapping submatrix keys to their index.
+        """
         return {
-            key: value["index"]
+            key: value['index']
             for submats in self.submatrices.values()
             for key, value in submats.items()
         }
-    
+
     def set_submatrix(self, field, key, matvecs):
         """
         Set a specific submatrix for a field.
-        :param field: The field (target) to which the submatrix belongs.
-        :param key: The submatrix key (e.g., 'J00', 'J01').
-        :param matrix: The actual submatrix value.
+
+        Parameters
+        ----------
+        field : Function
+            The target field that the submatrix operates on.
+        key: str
+            The identifier for the submatrix (e.g., 'J00', 'J01').
+        matvecs: list of Eq
+            The matrix-vector equations forming the submatrix.
         """
         if field in self.submatrices and key in self.submatrices[field]:
             self.submatrices[field][key]["matvecs"] = matvecs
         else:
-            raise KeyError(f"Invalid field ({field}) or submatrix key ({key})")
-    
+            raise KeyError(f'Invalid field ({field}) or submatrix key ({key})')
+
     def get_submatrix(self, field, key):
         """
         Retrieve a specific submatrix.
         """
         return self.submatrices.get(field, {}).get(key, None)
-    
+
     def __repr__(self):
-        """String representation of the Jacobian object."""
         return str(self.submatrices)

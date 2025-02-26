@@ -9,7 +9,8 @@ from devito.types.equation import InjectSolveEq
 from devito.operations.solve import eval_time_derivatives
 from devito.symbolics import retrieve_functions
 from devito.tools import as_tuple, filter_ordered
-from devito.petsc.types import LinearSolveExpr, PETScArray, DMDALocalInfo, FieldData, MultipleFieldData, SubMatrices
+from devito.petsc.types import (LinearSolveExpr, PETScArray, DMDALocalInfo,
+                                FieldData, MultipleFieldData, SubMatrices)
 
 
 __all__ = ['PETScSolve', 'EssentialBC']
@@ -17,16 +18,16 @@ __all__ = ['PETScSolve', 'EssentialBC']
 
 def PETScSolve(eqns_targets, target=None, solver_parameters=None, **kwargs):
     if target is not None:
-        injectsolve = InjectSolve().build({target: eqns_targets}, solver_parameters)
-        # TODO: the return should probs just be the InjectSolveEq object, not put into a list
-        return injectsolve
+        eq = InjectSolve().build({target: eqns_targets}, solver_parameters)
+        # TODO: the return should probs just be the InjectSolveEq
+        # object, not put into a list
+        return eq
 
     # If users want segregated solvers, they create multiple PETScSolve objects,
     # rather than passing multiple targets to a single PETScSolve object
     else:
-        # from IPython import embed; embed()
-        injectsolve = InjectSolveNested().build(eqns_targets, solver_parameters)
-        return injectsolve
+        eq = InjectSolveNested().build(eqns_targets, solver_parameters)
+        return eq
 
 
 class InjectSolve:
@@ -51,34 +52,24 @@ class InjectSolve:
         return target, tuple(funcs), fielddata, time_mapper
 
     def generate_field_data(self, eqns, target, time_mapper, arrays):
-        # TODO: change these names
-        # TODO: fielddata needs to extend/change to be a data per submatrix, i.e
-        # a list of matvecs, formfuncs, formrhs etc for each submatrix with a
-        # label /indexsert identifying it's location in the larger Jacobian
-
         formfuncs, formrhs = zip(
             *[self.build_function_eqns(eq, target, arrays, time_mapper) for eq in eqns]
         )
 
         matvecs = [self.build_matvec_eqns(eq, target, arrays, time_mapper) for eq in eqns]
 
-        # from IPython import embed; embed()
-        # jacobian.set_submatrix(target, 'J00')
         # todo, I think the prefixes could be specific to the solve not the fielddata ?
-        tmp =  FieldData(
+        return FieldData(
             target=target,
             matvecs=matvecs,
             formfuncs=formfuncs,
             formrhs=formrhs,
             arrays=arrays
         )
-        return tmp
 
     def build_function_eqns(self, eq, target, arrays, time_mapper):
         b, F_target, targets = separate_eqn(eq, target)
         name = target.name
-
-        # matvec = self.make_matvec(eq, F_target, arrays, name, targets)
         formfunc = self.make_formfunc(eq, F_target, arrays, name, targets)
         formrhs = self.make_rhs(eq, b, arrays, name)
 
@@ -87,7 +78,6 @@ class InjectSolve:
     def build_matvec_eqns(self, eq, target, arrays, time_mapper):
         b, F_target, targets = separate_eqn(eq, target)
         name = target.name
-        # from IPython import embed; embed()
         if not F_target:
             return None
         matvec = self.make_matvec(eq, F_target, arrays, name, targets)
@@ -135,14 +125,13 @@ class InjectSolve:
         prefixes = ['y_matvec', 'x_matvec', 'f_formfunc', 'x_formfunc', 'b_tmp']
 
         arrays = {
-            p: PETScArray(name='%s_%s' % (p, target.name),
-                        target=target,
-                        liveness='eager',
-                        localinfo=localinfo)
+            p: PETScArray(name=f'{p}_{target.name}',
+                          target=target,
+                          liveness='eager',
+                          localinfo=localinfo)
             for p in prefixes
         }
         return arrays
-
 
 
 class InjectSolveNested(InjectSolve):
@@ -157,45 +146,38 @@ class InjectSolveNested(InjectSolve):
         all_data = MultipleFieldData(submatrices)
 
         for target, eqns in eqns_targets.items():
-            other_targets = [t for t in list(eqns_targets.keys()) if t is not target]
             eqns = as_tuple(eqns)
             arrays = self.generate_arrays(target)
-            fielddata = self.generate_field_data_nested(eqns, target, time_mapper, arrays, submatrices)
+            fielddata = self.generate_field_data_nested(
+                eqns, target, time_mapper, arrays, submatrices
+            )
             all_data.add_field_data(fielddata)
 
         return target, tuple(funcs), all_data, time_mapper
 
     def generate_field_data_nested(self, eqns, target, time_mapper, arrays, jacobian):
         # TODO: change these names
-        # TODO: fielddata needs to extend/change to be a data per submatrix, i.e
-        # a list of matvecs, formfuncs, formrhs etc for each submatrix with a
-        # label /indexsert identifying it's location in the larger Jacobian
 
         formfuncs, formrhs = zip(
             *[self.build_function_eqns(eq, target, arrays, time_mapper) for eq in eqns]
         )
 
         for submat, mtvs in jacobian.submatrices[target].items():
-            # instead of target, you would use the 'derivative_wrt' or something
             deriv = mtvs['derivative_wrt']
-            # from IPython import embed; embed()
-            matvecs = [self.build_matvec_eqns(eq, deriv, arrays, time_mapper) for eq in eqns]
+            matvecs = [
+                self.build_matvec_eqns(eq, deriv, arrays, time_mapper) for eq in eqns
+            ]
             # TODO: improve
             if any(m is not None for m in matvecs):
                 jacobian.set_submatrix(target, submat, matvecs)
 
-        # from IPython import embed; embed()
-        # jacobian.set_submatrix(target, 'J00')
         # todo, I think the prefixes could be specific to the solve not the fielddata ?
-        tmp =  FieldData(
+        return FieldData(
             target=target,
             formfuncs=formfuncs,
             formrhs=formrhs,
             arrays=arrays
         )
-        return tmp
-
-
 
 
 class EssentialBC(Eq):
