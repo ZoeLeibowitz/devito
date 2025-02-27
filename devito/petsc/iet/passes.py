@@ -7,17 +7,16 @@ from devito.ir.iet import (Transformer, MapNodes, Iteration, BlankLine,
 from devito.symbolics import Byref, Macro, FieldFromPointer
 from devito.types import Symbol, Scalar
 from devito.petsc.types import (PetscMPIInt, PetscErrorCode, MultipleFieldData,
-                                IS, PETScStruct, Mat, LocalVec, GlobalVec,
-                                CallbackMat, SNES, DummyArg, PetscInt, SubDM, SubMats,
-                                MatReuse, LocalIS, CallbackSubDM, JacobianStruct,
-                                SubMatrixStruct)
+                                IS, Mat, LocalVec, GlobalVec, CallbackMat, SNES,
+                                DummyArg, PetscInt, SubDM, SubMats, MatReuse,
+                                LocalIS, CallbackSubDM, JacobianStruct, SubMatrixStruct)
 from devito.petsc.iet.nodes import InjectSolveDummy
 from devito.petsc.utils import core_metadata
 from devito.petsc.iet.routines import (CBBuilder, CCBBuilder, BaseObjectBuilder,
                                        CoupledObjectBuilder, BaseSetup, CoupledSetup,
                                        Solver, CoupledSolver, TimeDependent,
-                                       NonTimeDependent, DM)
-from devito.petsc.iet.utils import petsc_call, petsc_call_mpi, petsc_struct
+                                       NonTimeDependent)
+from devito.petsc.iet.utils import petsc_call, petsc_call_mpi
 
 
 @iet_pass
@@ -235,10 +234,12 @@ def populate_matrix_context(efuncs, objs):
         return
 
     subdms_expr = DummyExpr(
-        FieldFromPointer(objs['Subdms']._C_symbol, objs['ljacctx']), objs['Subdms']._C_symbol
+        FieldFromPointer(objs['Subdms']._C_symbol, objs['ljacctx']),
+        objs['Subdms']._C_symbol
     )
     fields_expr = DummyExpr(
-        FieldFromPointer(objs['Fields']._C_symbol, objs['ljacctx']), objs['Fields']._C_symbol
+        FieldFromPointer(objs['Fields']._C_symbol, objs['ljacctx']),
+        objs['Fields']._C_symbol
     )
     body = CallableBody(
         List(body=[subdms_expr, fields_expr]),

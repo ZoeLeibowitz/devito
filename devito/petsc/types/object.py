@@ -9,7 +9,7 @@ from devito.petsc.iet.utils import petsc_call
 class CallbackDM(LocalObject):
     """
     PETSc Data Management object (DM). This is the DM instance
-    accessed within the callback functions via `SNESGetDM` and 
+    accessed within the callback functions via `SNESGetDM` and
     is not destroyed during callback execution.
     """
     dtype = CustomDtype('DM')
@@ -55,6 +55,7 @@ class CallbackMat(LocalObject):
 
 class Mat(LocalObject):
     dtype = CustomDtype('Mat')
+
     @property
     def _C_free(self):
         return petsc_call('MatDestroy', [Byref(self.function)])
@@ -78,6 +79,7 @@ class CallbackGlobalVec(LocalVec):
     PETSc global vector object (Vec). For example, used for coupled
     solves inside the `WholeFormFunc` callback.
     """
+
 
 class GlobalVec(LocalVec):
     """
