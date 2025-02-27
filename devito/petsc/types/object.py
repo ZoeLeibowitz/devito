@@ -23,9 +23,10 @@ class DM(LocalObject):
     """
     dtype = CustomDtype('DM')
 
-    def __init__(self, *args, dofs=1, **kwargs):
+    def __init__(self, *args, dofs=1, destroy=True, **kwargs):
         super().__init__(*args, **kwargs)
         self._dofs = dofs
+        self._destroy = destroy
 
     @property
     def dofs(self):
@@ -33,7 +34,9 @@ class DM(LocalObject):
 
     @property
     def _C_free(self):
-        return petsc_call('DMDestroy', [Byref(self.function)])
+        if self._destroy:
+            petsc_call('DMDestroy', [Byref(self.function)])
+        return None
 
     @property
     def _C_free_priority(self):

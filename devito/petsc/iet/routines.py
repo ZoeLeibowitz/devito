@@ -973,7 +973,6 @@ class CoupledObjectBuilder(BaseObjectBuilder):
             base_dict[f'scatter{name}'] = VecScatter(
                 sreg.make_name(prefix=f'scatter{name}')
             )
-
         return base_dict
 
 
