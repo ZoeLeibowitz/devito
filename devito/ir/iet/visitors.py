@@ -190,7 +190,7 @@ class CGen(Visitor):
 
     def _gen_struct_decl(self, obj, masked=()):
         """
-        Convert ctypes.Struct -> cgen.Structure.
+        Convert ctypes.Struct and LocalCompositeObjects -> cgen.Structure.
         """
         ctype = obj._C_ctype
         try:
@@ -201,9 +201,6 @@ class CGen(Visitor):
                 return None
         except TypeError:
             # E.g., `ctype` is of type `dtypes_lowering.CustomDtype`
-            pass
-
-        if isinstance(ctype, CustomDtype):
             if isinstance(obj, LocalCompositeObject):
                 ctype = obj
             else:

@@ -19,7 +19,7 @@ from devito.tools import (Signer, as_tuple, filter_ordered, filter_sorted, flatt
                           ctypes_to_cstr)
 from devito.types.basic import (AbstractFunction, AbstractSymbol, Basic, Indexed,
                                 Symbol)
-from devito.types.object import AbstractObject, LocalObject
+from devito.types.object import AbstractObject, LocalObject, LocalCompositeObject
 
 __all__ = ['Node', 'MultiTraversable', 'Block', 'Expression', 'Callable',
            'Call', 'ExprStmt', 'Conditional', 'Iteration', 'List', 'Section',
@@ -1076,7 +1076,8 @@ class Dereference(ExprStmt, Node):
             ret.extend(flatten(i.free_symbols for i in self.pointee.symbolic_shape[1:]))
             ret.extend(self.pointer.free_symbols)
         else:
-            # assert issubclass(self.pointer._C_ctype, ctypes._Pointer)
+            assert isinstance(self.pointer, LocalCompositeObject) or \
+                issubclass(self.pointer._C_ctype, ctypes._Pointer)
             ret.extend([self.pointer._C_symbol, self.pointee._C_symbol])
         return tuple(filter_ordered(ret))
 
