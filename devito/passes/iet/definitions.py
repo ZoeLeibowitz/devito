@@ -256,11 +256,7 @@ class DataManager:
         """
         Allocate an Array of Objects in the low latency memory.
         """
-        try:
-            frees = obj._C_free
-        except AttributeError:
-            frees = None
-
+        frees = obj._C_free
         decl = Definition(obj)
 
         storage.update(obj, site, allocs=decl, frees=frees)

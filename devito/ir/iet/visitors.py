@@ -21,7 +21,7 @@ from devito.symbolics import (FieldFromComposite, FieldFromPointer,
                               ListInitializer, ccode, uxreplace)
 from devito.tools import (GenericVisitor, as_tuple, ctypes_to_cstr, filter_ordered,
                           filter_sorted, flatten, is_external_ctype,
-                          c_restrict_void_p, sorted_priority, CustomDtype)
+                          c_restrict_void_p, sorted_priority)
 from devito.types.basic import AbstractFunction, Basic
 from devito.types import (ArrayObject, CompositeObject, Dimension, Pointer,
                           IndexedData, DeviceMap, LocalCompositeObject)
@@ -190,7 +190,7 @@ class CGen(Visitor):
 
     def _gen_struct_decl(self, obj, masked=()):
         """
-        Convert ctypes.Struct and LocalCompositeObjects -> cgen.Structure.
+        Convert ctypes.Struct and LocalCompositeObject -> cgen.Structure.
         """
         ctype = obj._C_ctype
         try:

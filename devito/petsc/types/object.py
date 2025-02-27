@@ -1,4 +1,4 @@
-from devito.tools import CustomDtype, dtype_to_cstr, as_tuple
+from devito.tools import CustomDtype, dtype_to_cstr, as_tuple, CustomIntType
 from devito.types import (LocalObject, LocalCompositeObject, ModuloDimension,
                           TimeDimension, ArrayObject, CustomDimension)
 from devito.symbolics import Byref, Cast
@@ -109,7 +109,7 @@ class PetscInt(LocalObject):
     PETSc datatype used to represent `int` parameters
     to PETSc functions.
     """
-    dtype = CustomDtype('PetscInt')
+    dtype = CustomIntType('PetscInt')
 
 
 class KSP(LocalObject):

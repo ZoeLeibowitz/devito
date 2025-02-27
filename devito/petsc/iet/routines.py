@@ -4,7 +4,7 @@ from devito.ir.iet import (Call, FindSymbols, List, Uxreplace, CallableBody,
                            Dereference, DummyExpr, BlankLine, Callable, FindNodes,
                            retrieve_iteration_tree, filter_iterations, Iteration)
 from devito.symbolics import (Byref, FieldFromPointer, cast_mapper, VOIDP,
-                              FieldFromComposite, IntDiv, Modulo, Deref)
+                              FieldFromComposite, IntDiv, Deref, Mod)
 from devito.symbolics.unevaluation import Mul
 from devito.types.basic import AbstractFunction
 from devito.types import Temp, Dimension
@@ -754,7 +754,7 @@ class CCBBuilder(CBBuilder):
         i = Dimension(name='i')
 
         row_idx = DummyExpr(objs['rowidx'], IntDiv(i, objs['dof']))
-        col_idx = DummyExpr(objs['colidx'], Modulo(i, objs['dof']))
+        col_idx = DummyExpr(objs['colidx'], Mod(i, objs['dof']))
 
         deref_subdm = Dereference(objs['Subdms'], objs['ljacctx'])
 

@@ -10,8 +10,9 @@ from sympy.core.decorators import call_highest_priority
 from devito.finite_differences.elementary import Min, Max
 from devito.tools import (Pickable, Bunch, as_tuple, is_integer, float2,  # noqa
                           float3, float4, double2, double3, double4, int2, int3,
-                          int4)
+                          int4, CustomIntType)
 from devito.types import Symbol
+from devito.types.basic import Basic
 
 __all__ = ['CondEq', 'CondNe', 'IntDiv', 'CallFromPointer',  # noqa
            'CallFromComposite', 'FieldFromPointer', 'FieldFromComposite',
@@ -19,7 +20,7 @@ __all__ = ['CondEq', 'CondNe', 'IntDiv', 'CallFromPointer',  # noqa
            'MathFunction', 'InlineIf', 'ReservedWord', 'Keyword', 'String',
            'Macro', 'Class', 'MacroArgument', 'CustomType', 'Deref', 'Namespace',
            'Rvalue', 'INT', 'FLOAT', 'DOUBLE', 'VOID', 'VOIDP', 'Null', 'SizeOf', 'rfunc',
-           'cast_mapper', 'BasicWrapperMixin', 'ValueLimit', 'limits_mapper', 'Modulo']
+           'cast_mapper', 'BasicWrapperMixin', 'ValueLimit', 'limits_mapper', 'Mod']
 
 
 class CondEq(sympy.Eq):
@@ -89,10 +90,15 @@ class IntDiv(sympy.Expr):
             # Perhaps it's a symbolic RHS -- but we wanna be sure it's of type int
             if not hasattr(rhs, 'dtype'):
                 raise ValueError("Symbolic RHS `%s` lacks dtype" % rhs)
-            # # TODO: fix for when the denominator is a symbol
-            # if not issubclass(rhs.dtype, np.integer):
-            #     raise ValueError("Symbolic RHS `%s` must be of type `int`, found "
-            #                      "`%s` instead" % (rhs, rhs.dtype))
+
+            is_int_type = isinstance(rhs.dtype, type) and \
+                issubclass(rhs.dtype, np.integer)
+            is_custom_int_type = isinstance(rhs.dtype, CustomIntType)
+            assert is_int_type or is_custom_int_type, (
+                "Symbolic RHS `%s` must be of type `int`, found `%s` \
+                    instead" % (rhs, rhs.dtype)
+            )
+
         rhs = sympify(rhs)
 
         obj = sympy.Expr.__new__(cls, lhs, rhs)
@@ -115,9 +121,7 @@ class IntDiv(sympy.Expr):
         return super().__mul__(other)
 
 
-class Modulo(sympy.Expr):
-    """
-    """
+class Mod(sympy.Expr):
     is_Atom = True
 
     is_commutative = True
@@ -140,14 +144,6 @@ class Modulo(sympy.Expr):
         return "Mod(%s, %s)" % (self.lhs, self.rhs)
 
     __repr__ = __str__
-
-    # TODO: can maybe remove this?
-    @call_highest_priority('__rmul__')
-    def __mul__(self, other):
-        if other is self.rhs:
-            # a*(i/a) => i
-            return self.lhs
-        return super().__mul__(other)
 
 
 class BasicWrapperMixin:
@@ -202,9 +198,9 @@ class CallFromPointer(sympy.Expr, Pickable, BasicWrapperMixin):
             pointer = Symbol(pointer)
         if isinstance(call, str):
             call = Symbol(call)
-        # elif not isinstance(call, Basic):
-        #     raise ValueError("`call` must be a `devito.Basic` or a type "
-        #                      "with compatible interface")
+        elif not isinstance(call.base, Basic):
+            raise ValueError("`call` must be a `devito.Basic` or a type "
+                             "with compatible interface")
         _params = []
         for p in as_tuple(params):
             if isinstance(p, str):

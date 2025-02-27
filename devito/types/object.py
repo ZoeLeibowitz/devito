@@ -260,3 +260,7 @@ class LocalCompositeObject(CompositeObject, LocalType):
     @property
     def _fields_(self):
         return self.fields
+
+    @property
+    def _C_free(self):
+        return None
