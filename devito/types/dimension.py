@@ -1714,7 +1714,8 @@ class IndexAccessFunction(sympy.Add):
         return self.func(other, -self)
 
     def __mod__(self, other):
-        return sympy.Mod(sympy.Add(*self.args), other)
+        # return sympy.Mod(sympy.Add(*self.args), other)
+        return Modulo(sympy.Add(*self.args), other)
 
 
 class AffineIndexAccessFunction(IndexAccessFunction):
