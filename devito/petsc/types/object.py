@@ -23,10 +23,9 @@ class DM(LocalObject):
     """
     dtype = CustomDtype('DM')
 
-    def __init__(self, *args, dofs=1, destroy=True, **kwargs):
+    def __init__(self, *args, dofs=1, **kwargs):
         super().__init__(*args, **kwargs)
         self._dofs = dofs
-        self._destroy = destroy
 
     @property
     def dofs(self):
@@ -34,9 +33,7 @@ class DM(LocalObject):
 
     @property
     def _C_free(self):
-        if self._destroy:
-            petsc_call('DMDestroy', [Byref(self.function)])
-        return None
+        return petsc_call('DMDestroy', [Byref(self.function)])
 
     @property
     def _C_free_priority(self):
@@ -59,6 +56,9 @@ class CallbackMat(LocalObject):
 class Mat(LocalObject):
     dtype = CustomDtype('Mat')
 
+
+class Mat(LocalObject):
+    dtype = CustomDtype('Mat')
     @property
     def _C_free(self):
         return petsc_call('MatDestroy', [Byref(self.function)])
@@ -73,8 +73,6 @@ class LocalVec(LocalObject):
     PETSc local vector object (Vec).
     A local vector has ghost locations that contain values that are
     owned by other MPI ranks.
-    This type is also used for Vec objects used inside callback functions, which
-    do not want to be destroyed.
     """
     dtype = CustomDtype('Vec')
 
@@ -84,7 +82,6 @@ class CallbackGlobalVec(LocalVec):
     PETSc global vector object (Vec). For example, used for coupled
     solves inside the `WholeFormFunc` callback.
     """
-
 
 class GlobalVec(LocalVec):
     """
