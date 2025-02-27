@@ -18,47 +18,49 @@ __all__ = ['PETScSolve', 'EssentialBC']
 
 def PETScSolve(eqns_targets, target=None, solver_parameters=None, **kwargs):
     if target is not None:
-        eq = InjectSolve().build({target: eqns_targets}, solver_parameters)
-        # TODO: the return should probs just be the InjectSolveEq
-        # object, not put into a list
-        return eq
-
-    # If users want segregated solvers, they create multiple PETScSolve objects,
-    # rather than passing multiple targets to a single PETScSolve object
+        return InjectSolve(solver_parameters, {target: eqns_targets}).build()
     else:
-        eq = InjectSolveNested().build(eqns_targets, solver_parameters)
-        return eq
+        return InjectSolveNested(solver_parameters, eqns_targets).build()
 
 
 class InjectSolve:
-    def build(self, eqns_targets, solver_parameters):
-        target, funcs, fielddata, time_mapper = self.build_eq(
-            eqns_targets, solver_parameters
-        )
-        # Placeholder equation for inserting calls to the solver and generating
-        # correct time loop etc.
-        return [InjectSolveEq(target, LinearSolveExpr(
-                funcs, solver_parameters, fielddata=fielddata, time_mapper=time_mapper,
-                localinfo=localinfo))]
+    def __init__(self, solver_parameters=None, eqns_targets=None):
+        self.solver_params = solver_parameters
+        self.time_mapper = None
+        self.all_functions = None
+        self.eqns_targets = eqns_targets
 
-    def build_eq(self, eqns_targets, solver_parameters):
-        target, eqns = next(iter(eqns_targets.items()))
+    def build(self):
+        target, fielddata = self.build_fielddata()
+        # Placeholder equation for inserting calls to the solver
+        linear_solve = LinearSolveExpr(
+            tuple(self.all_functions),
+            self.solver_params,
+            fielddata=fielddata,
+            time_mapper=self.time_mapper,
+            localinfo=localinfo
+        )
+        return [InjectSolveEq(target, linear_solve)]
+
+    def build_fielddata(self):
+        target, eqns = next(iter(self.eqns_targets.items()))
         eqns = as_tuple(eqns)
-        funcs = get_funcs(eqns)
-        time_mapper = generate_time_mapper(funcs)
+
+        self.all_functions = get_funcs(eqns)
+        self.time_mapper = generate_time_mapper(self.all_functions)
 
         arrays = self.generate_arrays(target)
-        fielddata = self.generate_field_data(eqns, target, time_mapper, arrays)
-        return target, tuple(funcs), fielddata, time_mapper
+        fielddata = self.generate_field_data(eqns, target, arrays)
 
-    def generate_field_data(self, eqns, target, time_mapper, arrays):
+        return target, fielddata
+
+    def generate_field_data(self, eqns, target, arrays):
         formfuncs, formrhs = zip(
-            *[self.build_function_eqns(eq, target, arrays, time_mapper) for eq in eqns]
+            *[self.build_function_eqns(eq, target, arrays) for eq in eqns]
         )
 
-        matvecs = [self.build_matvec_eqns(eq, target, arrays, time_mapper) for eq in eqns]
+        matvecs = [self.build_matvec_eqns(eq, target, arrays) for eq in eqns]
 
-        # todo, I think the prefixes could be specific to the solve not the fielddata ?
         return FieldData(
             target=target,
             matvecs=matvecs,
@@ -67,111 +69,107 @@ class InjectSolve:
             arrays=arrays
         )
 
-    def build_function_eqns(self, eq, target, arrays, time_mapper):
+    def build_function_eqns(self, eq, target, arrays):
         b, F_target, targets = separate_eqn(eq, target)
-        name = target.name
-        formfunc = self.make_formfunc(eq, F_target, arrays, name, targets)
-        formrhs = self.make_rhs(eq, b, arrays, name)
+        formfunc = self.make_formfunc(eq, F_target, arrays, targets)
+        formrhs = self.make_rhs(eq, b, arrays)
 
-        return tuple(expr.subs(time_mapper) for expr in (formfunc, formrhs))
+        return tuple(expr.subs(self.time_mapper) for expr in (formfunc, formrhs))
 
-    def build_matvec_eqns(self, eq, target, arrays, time_mapper):
+    def build_matvec_eqns(self, eq, target, arrays):
         b, F_target, targets = separate_eqn(eq, target)
-        name = target.name
         if not F_target:
             return None
-        matvec = self.make_matvec(eq, F_target, arrays, name, targets)
-        return matvec.subs(time_mapper)
+        matvec = self.make_matvec(eq, F_target, arrays, targets)
+        return matvec.subs(self.time_mapper)
 
-    def make_matvec(self, eq, F_target, arrays, name, targets):
+    def make_matvec(self, eq, F_target, arrays, targets):
         if isinstance(eq, EssentialBC):
             return Eq(
-                arrays['y_matvec'], arrays['x_matvec'],
+                arrays['y'], arrays['x'],
                 subdomain=eq.subdomain
             )
         else:
             return Eq(
-                arrays['y_matvec'],
-                F_target.subs(targets_to_arrays(arrays['x_matvec'], targets)),
+                arrays['y'],
+                F_target.subs(targets_to_arrays(arrays['x'], targets)),
                 subdomain=eq.subdomain
             )
 
-    def make_formfunc(self, eq, F_target, arrays, name, targets):
+    def make_formfunc(self, eq, F_target, arrays, targets):
         if isinstance(eq, EssentialBC):
             return Eq(
-                arrays['f_formfunc'], 0.,
+                arrays['f'], 0.,
                 subdomain=eq.subdomain
             )
         else:
             return Eq(
-                arrays['f_formfunc'],
-                F_target.subs(targets_to_arrays(arrays['x_formfunc'], targets)),
+                arrays['f'],
+                F_target.subs(targets_to_arrays(arrays['x'], targets)),
                 subdomain=eq.subdomain
             )
 
-    def make_rhs(self, eq, b, arrays, name):
+    def make_rhs(self, eq, b, arrays):
         if isinstance(eq, EssentialBC):
             return Eq(
-                arrays['b_tmp'], 0,
+                arrays['b'], 0,
                 subdomain=eq.subdomain
             )
         else:
             return Eq(
-                arrays['b_tmp'], b,
+                arrays['b'], b,
                 subdomain=eq.subdomain
             )
 
     def generate_arrays(self, target):
-        prefixes = ['y_matvec', 'x_matvec', 'f_formfunc', 'x_formfunc', 'b_tmp']
-
-        arrays = {
+        return {
             p: PETScArray(name=f'{p}_{target.name}',
                           target=target,
                           liveness='eager',
                           localinfo=localinfo)
             for p in prefixes
         }
-        return arrays
 
 
 class InjectSolveNested(InjectSolve):
-    def build_eq(self, eqns_targets, solver_parameters):
-        combined_eqns = [item for sublist in eqns_targets.values() for item in sublist]
-        funcs = get_funcs(combined_eqns)
-        time_mapper = generate_time_mapper(funcs)
+    def build_fielddata(self):
+        combined_eqns = [item for sublist in self.eqns_targets.values() for item in sublist]
+        self.all_functions = get_funcs(combined_eqns)
+        self.time_mapper = generate_time_mapper(self.all_functions)
 
-        targets = list(eqns_targets.keys())
-        submatrices = SubMatrices(targets)
+        targets = list(self.eqns_targets.keys())
+        jacobian = SubMatrices(targets)
 
-        all_data = MultipleFieldData(submatrices)
+        all_data = MultipleFieldData(jacobian)
 
-        for target, eqns in eqns_targets.items():
+        for target, eqns in self.eqns_targets.items():
             eqns = as_tuple(eqns)
             arrays = self.generate_arrays(target)
-            fielddata = self.generate_field_data_nested(
-                eqns, target, time_mapper, arrays, submatrices
+
+            self.update_jacobian(eqns, target, jacobian, arrays)
+
+            fielddata = self.generate_field_data(
+                eqns, target, arrays
             )
             all_data.add_field_data(fielddata)
 
-        return target, tuple(funcs), all_data, time_mapper
+        return target, all_data
 
-    def generate_field_data_nested(self, eqns, target, time_mapper, arrays, jacobian):
-        # TODO: change these names
-
-        formfuncs, formrhs = zip(
-            *[self.build_function_eqns(eq, target, arrays, time_mapper) for eq in eqns]
-        )
-
+    def update_jacobian(self, eqns, target, jacobian, arrays):
         for submat, mtvs in jacobian.submatrices[target].items():
-            deriv = mtvs['derivative_wrt']
             matvecs = [
-                self.build_matvec_eqns(eq, deriv, arrays, time_mapper) for eq in eqns
+                self.build_matvec_eqns(eq, mtvs['derivative_wrt'], arrays)
+                for eq in eqns
             ]
-            # TODO: improve
+            # Set submatrix only if there's at least one non-zero matvec
             if any(m is not None for m in matvecs):
                 jacobian.set_submatrix(target, submat, matvecs)
+    
+    def generate_field_data(self, eqns, target, arrays):
+        formfuncs, formrhs = zip(
+            *[self.build_function_eqns(eq, target, arrays) for eq in eqns]
+        )
 
-        # todo, I think the prefixes could be specific to the solve not the fielddata ?
         return FieldData(
             target=target,
             formfuncs=formfuncs,
@@ -350,3 +348,4 @@ def get_funcs(eqns):
 
 
 localinfo = DMDALocalInfo(name='info', liveness='eager')
+prefixes = ['y', 'x', 'f', 'b']

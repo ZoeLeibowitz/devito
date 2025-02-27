@@ -128,8 +128,8 @@ class CBBuilder:
 
         # TODO: maybe this shouldn't be attached to the fielddata -> think about this
         # currently it's attched to both i think
-        y_matvec = fielddata.arrays['y_matvec']
-        x_matvec = fielddata.arrays['x_matvec']
+        y_matvec = fielddata.arrays['y']
+        x_matvec = fielddata.arrays['x']
 
         mat_get_dm = petsc_call('MatGetDM', [objs['J'], Byref(dmda)])
 
@@ -269,8 +269,8 @@ class CBBuilder:
         fields = self._dummy_fields(body)
         self._struct_params.extend(fields)
 
-        f_formfunc = fielddata.arrays['f_formfunc']
-        x_formfunc = fielddata.arrays['x_formfunc']
+        f_formfunc = fielddata.arrays['f']
+        x_formfunc = fielddata.arrays['x']
 
         dm_cast = DummyExpr(dmda, DMCast(objs['dummyptr']), init=True)
 
@@ -411,7 +411,7 @@ class CBBuilder:
             sobjs['blocal']
         ])
 
-        b_arr = fielddata.arrays['b_tmp']
+        b_arr = fielddata.arrays['b']
 
         vec_get_array = petsc_call(
             'VecGetArray', [sobjs['blocal'], Byref(b_arr._C_symbol)]

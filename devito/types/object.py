@@ -253,14 +253,9 @@ class LocalCompositeObject(CompositeObject, LocalType):
         dtype = CustomDtype('struct %s' % pname, modifier=modifier)
         Object.__init__(self, name, dtype, None)
         self._pname = pname
-        # TODO: not sure if I need the liveness now
         assert liveness in ['eager', 'lazy']
         self._liveness = liveness
 
     @property
     def _fields_(self):
         return self.fields
-
-    @property
-    def _C_free(self):
-        return None

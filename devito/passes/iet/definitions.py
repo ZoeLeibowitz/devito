@@ -256,7 +256,7 @@ class DataManager:
         """
         Allocate an Array of Objects in the low latency memory.
         """
-        frees = obj._C_free
+        frees = getattr(obj, '_C_free', None)
         decl = Definition(obj)
 
         storage.update(obj, site, allocs=decl, frees=frees)
