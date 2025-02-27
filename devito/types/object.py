@@ -263,16 +263,8 @@ class LocalCompositeObject(CompositeObject, LocalType):
 
     @property
     def _fields_(self):
-<<<<<<< HEAD
         return [(i._C_name, i._C_ctype) for i in self.fields]
 
     @property
     def __name__(self):
         return self.pname
-=======
-        return self.fields
-
-    @property
-    def _C_free(self):
-        return None
->>>>>>> da173c8cd (misc: cleanup)
