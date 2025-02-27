@@ -349,6 +349,4 @@ def get_funcs(eqns):
     return filter_ordered(funcs)
 
 
-# TODO: don't need this?
-lhs = Symbol('lhs')
 localinfo = DMDALocalInfo(name='info', liveness='eager')

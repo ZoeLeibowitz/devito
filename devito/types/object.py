@@ -8,7 +8,7 @@ from devito.types.basic import Basic, LocalType
 from devito.types.utils import CtypesFactory
 
 
-__all__ = ['Object', 'LocalObject', 'CompositeObject', 'CCompositeObject']
+__all__ = ['Object', 'LocalObject', 'CompositeObject', 'LocalCompositeObject']
 
 
 class AbstractObject(Basic, sympy.Basic, Pickable):
@@ -241,7 +241,7 @@ class LocalObject(AbstractObject, LocalType):
         return self._is_global
 
 
-class CCompositeObject(CompositeObject, LocalType):
+class LocalCompositeObject(CompositeObject, LocalType):
 
     """
     Object with composite type (e.g., a C struct) defined in C.

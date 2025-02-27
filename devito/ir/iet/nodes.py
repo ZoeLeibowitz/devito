@@ -1050,7 +1050,7 @@ class Dereference(ExprStmt, Node):
     The following cases are supported:
 
         * `pointer` is a PointerArray or TempFunction, and `pointee` is an Array.
-        * `pointer` is an ArrayObject or CCompositeObject representing a pointer
+        * `pointer` is an ArrayObject or LocalCompositeObject representing a pointer
            to a C struct, and `pointee` is a field in `pointer`.
     """
 

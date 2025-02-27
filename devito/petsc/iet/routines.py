@@ -913,12 +913,13 @@ class CoupledObjectBuilder(BaseObjectBuilder):
         injectsolve = self.injectsolve
         sreg = self.sregistry
         objs = self.objs
+        targets = self.fielddata.targets
 
         base_dict['fields'] = IS(
-            name=sreg.make_name(prefix='fields')
+            name=sreg.make_name(prefix='fields'), nindices=len(targets)
         )
         base_dict['subdms'] = SubDM(
-            name=sreg.make_name(prefix='subdms')
+            name=sreg.make_name(prefix='subdms'), nindices=len(targets)
         )
         base_dict['nfields'] = PetscInt(sreg.make_name(prefix='nfields'))
 

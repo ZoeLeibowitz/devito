@@ -1,5 +1,5 @@
 from devito.tools import CustomDtype, dtype_to_cstr, as_tuple
-from devito.types import (LocalObject, CCompositeObject, ModuloDimension,
+from devito.types import (LocalObject, LocalCompositeObject, ModuloDimension,
                           TimeDimension, ArrayObject, CustomDimension)
 from devito.symbolics import Byref, Cast
 
@@ -194,7 +194,7 @@ class SingleIS(LocalObject):
     dtype = CustomDtype('IS')
 
 
-class PETScStruct(CCompositeObject):
+class PETScStruct(LocalCompositeObject):
 
     __rargs__ = ('name', 'pname', 'fields')
 
@@ -226,7 +226,7 @@ class PETScStruct(CCompositeObject):
 
     _C_modifier = ' *'
 
-    # TODO: maybe this should move to CCompositeObject itself
+    # TODO: maybe this should move to LocalCompositeObject itself
     @property
     def _fields_(self):
         return [(i._C_name, i._C_ctype) for i in self.fields]
