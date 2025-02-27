@@ -217,19 +217,6 @@ class PETScStruct(LocalCompositeObject):
 
     _C_modifier = ' *'
 
-<<<<<<< HEAD
-=======
-    # TODO: maybe this should move to LocalCompositeObject itself
-    @property
-    def _fields_(self):
-        return [(i._C_name, i._C_ctype) for i in self.fields]
-
-    # IMPROVE: this is because of the use inside iet/visitors struct decl
-    @property
-    def __name__(self):
-        return self.pname
-
->>>>>>> 8d73e86ea (misc: Edit iet/visitors)
 
 class JacobianStruct(PETScStruct):
     def __init__(self, name='jctx', pname='JacobianCtx', fields=None,
