@@ -7,15 +7,16 @@ from devito.ir.iet import (Transformer, MapNodes, Iteration, BlankLine,
 from devito.symbolics import Byref, Macro, FieldFromPointer
 from devito.types import Symbol, Scalar
 from devito.petsc.types import (PetscMPIInt, PetscErrorCode, MultipleFieldData,
-                                IS, PETScStruct, CallbackDM, Mat, LocalVec, GlobalVec,
-                                LocalMat, SNES, DummyArg, PetscInt, SubDM, SubMats,
-                                MatReuse, LocalIS, LocalSubDMs)
+                                IS, PETScStruct, Mat, LocalVec, GlobalVec,
+                                CallbackMat, SNES, DummyArg, PetscInt, SubDM, SubMats,
+                                MatReuse, LocalIS, CallbackSubDM, JacobianStruct,
+                                SubMatrixStruct)
 from devito.petsc.iet.nodes import InjectSolveDummy
 from devito.petsc.utils import core_metadata
 from devito.petsc.iet.routines import (CBBuilder, CCBBuilder, BaseObjectBuilder,
                                        CoupledObjectBuilder, BaseSetup, CoupledSetup,
                                        Solver, CoupledSolver, TimeDependent,
-                                       NonTimeDependent)
+                                       NonTimeDependent, DM)
 from devito.petsc.iet.utils import petsc_call, petsc_call_mpi, petsc_struct
 
 
@@ -78,7 +79,7 @@ def init_petsc(objs, **kwargs):
     Null = objs['Null']
     initialize = petsc_call('PetscInitialize', [Null, Null, Null, Null])
 
-    return objs['petsc_func_begin_user'], initialize
+    return objs['begin_user'], initialize
 
 
 def make_core_petsc_calls(objs, **kwargs):
@@ -97,7 +98,8 @@ def build_core_objects(grid, **kwargs):
     Devito's `reuse_efuncs` functionality, allowing reuse of efuncs when
     they are semantically identical.
 
-    TODO: Further refinement is needed to make use of `reuse_efuncs`.
+    TODO: Further refinement is needed to make use of `reuse_efuncs`. Also,
+    add docs for the objects inside the dict.
     """
     if kwargs['options']['mpi']:
         communicator = grid.distributor._obj_comm
@@ -107,15 +109,15 @@ def build_core_objects(grid, **kwargs):
     subdms = SubDM(name='subdms')
     fields = IS(name='fields')
     submats = SubMats(name='submats')
+    rows = IS(name='rows')
+    cols = IS(name='cols')
 
     return {
         'size': PetscMPIInt(name='size'),
         'comm': communicator,
         'err': PetscErrorCode(name='err'),
         'grid': grid,
-
-        # Matrices & Vectors
-        'block': LocalMat('block'),
+        'block': CallbackMat('block'),
         'submat_arr': SubMats(name='submat_arr'),
         'subblockrows': PetscInt('subblockrows'),
         'subblockcols': PetscInt('subblockcols'),
@@ -129,53 +131,29 @@ def build_core_objects(grid, **kwargs):
         'F': GlobalVec('F'),
         'floc': LocalVec('floc'),
         'B': GlobalVec('B'),
-
-        # Callback & Contexts
-        'cbdm': CallbackDM('dm', liveness='eager'),
         'nfields': PetscInt('nfields'),
-
-        # Index Sets (IS)
-        'irow': IS(name='irow', nindices=1),
-        'icol': IS(name='icol', nindices=1),
+        'irow': IS(name='irow'),
+        'icol': IS(name='icol'),
         'nsubmats': Scalar('nsubmats', dtype=np.int32),
         'matreuse': MatReuse('scall'),
-
-        # SNES Solver
         'snes': SNES('snes'),
-
-        # SubMatrixCtx struct members
-        'rows': IS(name='rows', nindices=1),
-        'cols': IS(name='cols', nindices=1),
-
-        # JacMatrixCtx struct members
+        'rows': rows,
+        'cols': cols,
         'Subdms': subdms,
-        'LocalSubdms': LocalSubDMs(name='subdms', nindices=1),
+        'LocalSubdms': CallbackSubDM(name='subdms'),
         'Fields': fields,
-        'LocalFields': LocalIS(name='fields', nindices=1),
+        'LocalFields': LocalIS(name='fields'),
         'Submats': submats,
-
-        # Jacobian Context
-        'ljacctx': petsc_struct(
-            name='jctx',
-            pname='JacobianCtx',
-            fields=[subdms, fields, submats],
-            liveness='lazy',
-            modifier=' *'
+        'ljacctx': JacobianStruct(
+            fields=[subdms, fields, submats], modifier=' *'
         ),
-
-        'jctx': PETScStruct(
-            name='jctx', pname='JacobianCtx',
-            fields=[subdms, fields], liveness='lazy'
-        ),
-
+        'subctx': SubMatrixStruct(fields=[rows, cols]),
         'Null': Macro('NULL'),
         'dummyctx': Symbol('lctx'),
         'dummyptr': DummyArg('dummy'),
         'dummyefunc': Symbol('dummyefunc'),
         'dof': PetscInt('dof'),
-
-        # PETSc Function Begin
-        'petsc_func_begin_user': c.Line('PetscFunctionBeginUser;'),
+        'begin_user': c.Line('PetscFunctionBeginUser;'),
     }
 
 
@@ -257,17 +235,17 @@ def populate_matrix_context(efuncs, objs):
         return
 
     subdms_expr = DummyExpr(
-        FieldFromPointer(objs['Subdms']._C_symbol, objs['jctx']), objs['Subdms']._C_symbol
+        FieldFromPointer(objs['Subdms']._C_symbol, objs['ljacctx']), objs['Subdms']._C_symbol
     )
     fields_expr = DummyExpr(
-        FieldFromPointer(objs['Fields']._C_symbol, objs['jctx']), objs['Fields']._C_symbol
+        FieldFromPointer(objs['Fields']._C_symbol, objs['ljacctx']), objs['Fields']._C_symbol
     )
     body = CallableBody(
         List(body=[subdms_expr, fields_expr]),
-        init=(objs['petsc_func_begin_user'],),
+        init=(objs['begin_user'],),
         retstmt=tuple([Call('PetscFunctionReturn', arguments=[0])])
     )
     efuncs[name] = Callable(
         name, body, objs['err'],
-        parameters=[objs['jctx'], objs['Subdms'], objs['Fields']]
+        parameters=[objs['ljacctx'], objs['Subdms'], objs['Fields']]
     )

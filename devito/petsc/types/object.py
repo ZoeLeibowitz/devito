@@ -6,6 +6,15 @@ from devito.symbolics import Byref, Cast
 from devito.petsc.iet.utils import petsc_call
 
 
+class CallbackDM(LocalObject):
+    """
+    PETSc Data Management object (DM). This is the DM instance
+    accessed within the callback functions via `SNESGetDM` and 
+    is not destroyed during callback execution.
+    """
+    dtype = CustomDtype('DM')
+
+
 class DM(LocalObject):
     """
     PETSc Data Management object (DM). This is the primary DM instance
@@ -35,23 +44,17 @@ class DMCast(Cast):
     _base_typ = 'DM'
 
 
-class CallbackDM(LocalObject):
+class CallbackMat(LocalObject):
     """
-    PETSc Data Management object (DM). This is the DM instance
-    accessed within the callback functions via `SNESGetDM`.
-    """
-    dtype = CustomDtype('DM')
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-
-class Mat(LocalObject):
-    """
-    PETSc Matrix object (Mat).
+    PETSc Matrix object (Mat) used within callback functions.
+    These instances are not destroyed during callback execution;
+    instead, they are managed and destroyed in the main kernel.
     """
     dtype = CustomDtype('Mat')
 
+
+class Mat(LocalObject):
+    dtype = CustomDtype('Mat')
     @property
     def _C_free(self):
         return petsc_call('MatDestroy', [Byref(self.function)])
@@ -61,29 +64,27 @@ class Mat(LocalObject):
         return 2
 
 
-class LocalMat(LocalObject):
-    dtype = CustomDtype('Mat')
-
-
 class LocalVec(LocalObject):
     """
     PETSc local vector object (Vec).
     A local vector has ghost locations that contain values that are
     owned by other MPI ranks.
-    This type is also used for Vec objects used inside callback functions, which
-    do not want to be destroyed.
     """
     dtype = CustomDtype('Vec')
 
 
-class GlobalVec(LocalObject):
+class CallbackGlobalVec(LocalVec):
+    """
+    PETSc global vector object (Vec). For example, used for coupled
+    solves inside the `WholeFormFunc` callback.
+    """
+
+class GlobalVec(LocalVec):
     """
     PETSc global vector object (Vec).
     A global vector is a parallel vector that has no duplicate values
     between MPI ranks. A global vector has no ghost locations.
     """
-    dtype = CustomDtype('Vec')
-
     @property
     def _C_free(self):
         return petsc_call('VecDestroy', [Byref(self.function)])
@@ -117,12 +118,14 @@ class KSP(LocalObject):
     dtype = CustomDtype('KSP')
 
 
-class SNES(LocalObject):
+class CallbackSNES(LocalObject):
     """
     PETSc SNES : Non-Linear Systems Solvers.
     """
     dtype = CustomDtype('SNES')
 
+
+class SNES(CallbackSNES):
     @property
     def _C_free(self):
         return petsc_call('SNESDestroy', [Byref(self.function)])
@@ -232,8 +235,21 @@ class PETScStruct(CCompositeObject):
         return self.pname
 
 
-# TODO: obvs generalise and improve..should probs use caststar?
-class StructCast(Cast):
+class JacobianStruct(PETScStruct):
+    def __init__(self, name='jctx', pname='JacobianCtx', fields=None,
+                 modifier='', liveness='lazy'):
+        super().__init__(name, pname, fields, modifier, liveness)
+    _C_modifier = None
+
+
+class SubMatrixStruct(PETScStruct):
+    def __init__(self, name='subctx', pname='SubMatrixCtx', fields=None,
+                 modifier=' *', liveness='lazy'):
+        super().__init__(name, pname, fields, modifier, liveness)
+    _C_modifier = None
+
+
+class JacobianStructCast(Cast):
     _base_typ = 'struct JacobianCtx *'
 
 
@@ -296,13 +312,13 @@ class IS(LocalIS):
         return destroy_calls
 
 
-class LocalSubDMs(PETScArrayObject):
+class CallbackSubDM(PETScArrayObject):
     @property
     def dtype(self):
         return CustomDtype('DM', modifier=' *')
 
 
-class SubDM(LocalSubDMs):
+class SubDM(CallbackSubDM):
     @property
     def _C_free(self):
         destroy_calls = [
