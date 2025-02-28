@@ -123,12 +123,12 @@ def test_petsc_solve():
     rhs_expr = FindNodes(Expression).visit(formrhs_callback[0])
 
     assert str(action_expr[-1].expr.rhs) == \
-        'x_matvec_f[x + 1, y + 2]/ctx0->h_x**2' + \
-        ' - 2.0*x_matvec_f[x + 2, y + 2]/ctx0->h_x**2' + \
-        ' + x_matvec_f[x + 3, y + 2]/ctx0->h_x**2' + \
-        ' + x_matvec_f[x + 2, y + 1]/ctx0->h_y**2' + \
-        ' - 2.0*x_matvec_f[x + 2, y + 2]/ctx0->h_y**2' + \
-        ' + x_matvec_f[x + 2, y + 3]/ctx0->h_y**2'
+        'x_f[x + 1, y + 2]/ctx0->h_x**2' + \
+        ' - 2.0*x_f[x + 2, y + 2]/ctx0->h_x**2' + \
+        ' + x_f[x + 3, y + 2]/ctx0->h_x**2' + \
+        ' + x_f[x + 2, y + 1]/ctx0->h_y**2' + \
+        ' - 2.0*x_f[x + 2, y + 2]/ctx0->h_y**2' + \
+        ' + x_f[x + 2, y + 3]/ctx0->h_y**2'
 
     assert str(rhs_expr[-1].expr.rhs) == 'g[x + 2, y + 2]'
 
@@ -202,12 +202,12 @@ def test_petsc_cast():
     cb2 = [meta_call.root for meta_call in op2._func_table.values()]
     cb3 = [meta_call.root for meta_call in op3._func_table.values()]
 
-    assert 'float (*restrict x_matvec_f1) = ' + \
-        '(float (*)) x_matvec_f1_vec;' in str(cb1[0])
-    assert 'float (*restrict x_matvec_f2)[info.gxm] = ' + \
-        '(float (*)[info.gxm]) x_matvec_f2_vec;' in str(cb2[0])
-    assert 'float (*restrict x_matvec_f3)[info.gym][info.gxm] = ' + \
-        '(float (*)[info.gym][info.gxm]) x_matvec_f3_vec;' in str(cb3[0])
+    assert 'float (*restrict x_f1) = ' + \
+        '(float (*)) x_f1_vec;' in str(cb1[0])
+    assert 'float (*restrict x_f2)[info.gxm] = ' + \
+        '(float (*)[info.gxm]) x_f2_vec;' in str(cb2[0])
+    assert 'float (*restrict x_f3)[info.gym][info.gxm] = ' + \
+        '(float (*)[info.gym][info.gxm]) x_f3_vec;' in str(cb3[0])
 
 
 @skipif('petsc')

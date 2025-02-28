@@ -16,25 +16,24 @@ from devito.petsc.types import (LinearSolveExpr, PETScArray, DMDALocalInfo,
 __all__ = ['PETScSolve', 'EssentialBC']
 
 
-def PETScSolve(eqns_targets, target=None, solver_parameters=None, **kwargs):
+def PETScSolve(target_eqns, target=None, solver_parameters=None, **kwargs):
     if target is not None:
-        return InjectSolve(solver_parameters, {target: eqns_targets}).build()
+        return InjectSolve(solver_parameters, {target: target_eqns}).build_eq()
     else:
-        return InjectSolveNested(solver_parameters, eqns_targets).build()
+        return InjectSolveNested(solver_parameters, target_eqns).build_eq()
 
 
 class InjectSolve:
-    def __init__(self, solver_parameters=None, eqns_targets=None):
+    def __init__(self, solver_parameters=None, target_eqns=None):
         self.solver_params = solver_parameters
         self.time_mapper = None
-        self.all_functions = None
-        self.eqns_targets = eqns_targets
+        self.target_eqns = target_eqns
 
-    def build(self):
-        target, fielddata = self.build_fielddata()
+    def build_eq(self):
+        target, funcs, fielddata = self.linear_solve_args()
         # Placeholder equation for inserting calls to the solver
         linear_solve = LinearSolveExpr(
-            tuple(self.all_functions),
+            funcs,
             self.solver_params,
             fielddata=fielddata,
             time_mapper=self.time_mapper,
@@ -42,23 +41,20 @@ class InjectSolve:
         )
         return [InjectSolveEq(target, linear_solve)]
 
-    def build_fielddata(self):
-        target, eqns = next(iter(self.eqns_targets.items()))
+    def linear_solve_args(self):
+        target, eqns = next(iter(self.target_eqns.items()))
         eqns = as_tuple(eqns)
 
-        self.all_functions = get_funcs(eqns)
-        self.time_mapper = generate_time_mapper(self.all_functions)
-
+        funcs = get_funcs(eqns)
+        self.time_mapper = generate_time_mapper(funcs)
         arrays = self.generate_arrays(target)
-        fielddata = self.generate_field_data(eqns, target, arrays)
 
-        return target, fielddata
+        return target, tuple(funcs), self.generate_field_data(eqns, target, arrays)
 
     def generate_field_data(self, eqns, target, arrays):
         formfuncs, formrhs = zip(
             *[self.build_function_eqns(eq, target, arrays) for eq in eqns]
         )
-
         matvecs = [self.build_matvec_eqns(eq, target, arrays) for eq in eqns]
 
         return FieldData(
@@ -132,17 +128,17 @@ class InjectSolve:
 
 
 class InjectSolveNested(InjectSolve):
-    def build_fielddata(self):
-        combined_eqns = [item for sublist in self.eqns_targets.values() for item in sublist]
-        self.all_functions = get_funcs(combined_eqns)
-        self.time_mapper = generate_time_mapper(self.all_functions)
+    def linear_solve_args(self):
+        combined_eqns = [eq for eqns in self.target_eqns.values() for eq in eqns]
+        funcs = get_funcs(combined_eqns)
+        self.time_mapper = generate_time_mapper(funcs)
 
-        targets = list(self.eqns_targets.keys())
+        targets = list(self.target_eqns.keys())
         jacobian = SubMatrices(targets)
 
         all_data = MultipleFieldData(jacobian)
 
-        for target, eqns in self.eqns_targets.items():
+        for target, eqns in self.target_eqns.items():
             eqns = as_tuple(eqns)
             arrays = self.generate_arrays(target)
 
@@ -153,7 +149,7 @@ class InjectSolveNested(InjectSolve):
             )
             all_data.add_field_data(fielddata)
 
-        return target, all_data
+        return target, tuple(funcs), all_data
 
     def update_jacobian(self, eqns, target, jacobian, arrays):
         for submat, mtvs in jacobian.submatrices[target].items():
@@ -161,10 +157,10 @@ class InjectSolveNested(InjectSolve):
                 self.build_matvec_eqns(eq, mtvs['derivative_wrt'], arrays)
                 for eq in eqns
             ]
-            # Set submatrix only if there's at least one non-zero matvec
+            # Set submatrix only if there's at least one non-zero matvec
             if any(m is not None for m in matvecs):
                 jacobian.set_submatrix(target, submat, matvecs)
-    
+
     def generate_field_data(self, eqns, target, arrays):
         formfuncs, formrhs = zip(
             *[self.build_function_eqns(eq, target, arrays) for eq in eqns]
@@ -349,3 +345,4 @@ def get_funcs(eqns):
 
 localinfo = DMDALocalInfo(name='info', liveness='eager')
 prefixes = ['y', 'x', 'f', 'b']
+lhs = Symbol('PETSc')
