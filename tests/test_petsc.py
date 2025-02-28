@@ -3,7 +3,8 @@ import os
 import pytest
 
 from conftest import skipif
-from devito import Grid, Function, TimeFunction, Eq, Operator, switchconfig
+from devito import (Grid, Function, TimeFunction, Eq, Operator, switchconfig,
+                    norm)
 from devito.ir.iet import (Call, ElementalFunction, Definition, DummyExpr,
                            FindNodes, retrieve_iteration_tree)
 from devito.types import Constant, LocalCompositeObject
@@ -291,7 +292,7 @@ def test_cinterface_petsc_struct():
 
     assert 'include "%s.h"' % name in ccode
 
-    # The public `struct MatContext` only appears in the header file
+    # The public `struct UserCtx` only appears in the header file
     assert 'struct UserCtx0\n{' not in ccode
     assert 'struct UserCtx0\n{' in hcode
 
@@ -773,3 +774,102 @@ def test_time_loop():
 
     assert 'ctx0.t0 = t0' in body4
     assert body4.count('ctx0.t0 = t0') == 1
+
+
+class TestCoupledLinear:
+    # The coupled interface can be used even for uncoupled problems, meaning
+    # the equations will be solved within a single matrix system.
+    # These tests use simple problems to validate functionality, but they help
+    # ensure correctness in code generation.
+    # TODO: Add more comprehensive tests for fully coupled problems.
+
+    def test_coupled_vs_non_coupled(self):
+        grid = Grid(shape=(11, 11))
+
+        e = Function(name='e', grid=grid, space_order=2)
+        f = Function(name='f', grid=grid, space_order=2)
+        g = Function(name='g', grid=grid, space_order=2)
+        h = Function(name='h', grid=grid, space_order=2)
+
+        f.data[:] = 5.
+        h.data[:] = 5.
+
+        eq1 = Eq(e.laplace, f)
+        eq2 = Eq(g.laplace, h)
+
+        # Non-coupled
+        petsc1 = PETScSolve(eq1, target=e)
+        petsc2 = PETScSolve(eq2, target=g)
+        with switchconfig(openmp=False, mpi=True):
+            op1 = Operator(petsc1 + petsc2, opt='noop')
+        op1.apply()
+
+        enorm1 = norm(e)
+        gnorm1 = norm(g)
+
+        # reset
+        e.data[:] = 0
+        g.data[:] = 0
+
+        # Coupled
+        # TODO: Need to think of a more friendly API for coupled - just
+        # using a dict for now
+        petsc3 = PETScSolve({e: [eq1], g: [eq2]})
+        with switchconfig(openmp=False, mpi=True):
+            op2 = Operator(petsc3, opt='noop')
+        op2.apply()
+
+        enorm2 = norm(e)
+        gnorm2 = norm(g)
+
+        assert np.isclose(enorm1, enorm2, rtol=1e-5)
+        assert np.isclose(gnorm1, gnorm2, rtol=1e-5)
+
+        callbacks1 = [meta_call.root for meta_call in op1._func_table.values()]
+        callbacks2 = [meta_call.root for meta_call in op2._func_table.values()]
+
+        # Solving for multiple fields within the same matrix system requires
+        # additional machinery and more callback functions
+        assert len(callbacks1) == 7
+        assert len(callbacks2) == 11
+
+    def test_coupled_structs(self):
+        grid = Grid(shape=(11, 11))
+
+        e = Function(name='e', grid=grid, space_order=2)
+        f = Function(name='f', grid=grid, space_order=2)
+        g = Function(name='g', grid=grid, space_order=2)
+        h = Function(name='h', grid=grid, space_order=2)
+
+        eq1 = Eq(e + 5, f)
+        eq2 = Eq(g + 10, h)
+
+        petsc = PETScSolve({f: [eq1], h: [eq2]})
+
+        name = "foo"
+        with switchconfig(openmp=False):
+            op = Operator(petsc, name=name)
+
+        # Trigger the generation of a .c and a .h files
+        ccode, hcode = op.cinterface(force=True)
+
+        dirname = op._compiler.get_jit_dir()
+        assert os.path.isfile(os.path.join(dirname, "%s.c" % name))
+        assert os.path.isfile(os.path.join(dirname, "%s.h" % name))
+
+        ccode = str(ccode)
+        hcode = str(hcode)
+
+        assert 'include "%s.h"' % name in ccode
+
+        # The public `struct JacobianCtx` only appears in the header file
+        assert 'struct JacobianCtx\n{' not in ccode
+        assert 'struct JacobianCtx\n{' in hcode
+
+        # The public `struct SubMatrixCtx` only appears in the header file
+        assert 'struct SubMatrixCtx\n{' not in ccode
+        assert 'struct SubMatrixCtx\n{' in hcode
+
+        # The public `struct UserCtx0` only appears in the header file
+        assert 'struct UserCtx0\n{' not in ccode
+        assert 'struct UserCtx0\n{' in hcode
