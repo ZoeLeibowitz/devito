@@ -293,7 +293,7 @@ class PETScArrayObject(ArrayObject):
         return 0
 
 
-class LocalIS(PETScArrayObject):
+class CallbackPointerIS(PETScArrayObject):
     """
     Index set object used for efficient indexing into vectors and matrices.
     https://petsc.org/release/manualpages/IS/IS/
@@ -303,7 +303,7 @@ class LocalIS(PETScArrayObject):
         return CustomDtype('IS', modifier=' *')
 
 
-class IS(LocalIS):
+class PointerIS(CallbackPointerIS):
     @property
     def _C_free(self):
         destroy_calls = [
@@ -314,13 +314,13 @@ class IS(LocalIS):
         return destroy_calls
 
 
-class CallbackSubDM(PETScArrayObject):
+class CallbackPointerDM(PETScArrayObject):
     @property
     def dtype(self):
         return CustomDtype('DM', modifier=' *')
 
 
-class SubDM(CallbackSubDM):
+class PointerDM(CallbackPointerDM):
     @property
     def _C_free(self):
         destroy_calls = [
@@ -331,7 +331,7 @@ class SubDM(CallbackSubDM):
         return destroy_calls
 
 
-class SubMats(PETScArrayObject):
+class PointerMat(PETScArrayObject):
     _C_modifier = ' *'
 
     @property

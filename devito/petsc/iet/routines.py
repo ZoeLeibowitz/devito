@@ -16,7 +16,7 @@ from devito.petsc.iet.nodes import (PETScCallable, FormFunctionCallback,
 from devito.petsc.iet.utils import petsc_call, petsc_struct
 from devito.petsc.utils import solver_mapper
 from devito.petsc.types import (DM, Mat, LocalVec, GlobalVec, KSP, PC, SNES,
-                                PetscInt, StartPtr, IS, SubDM, VecScatter,
+                                PetscInt, StartPtr, PointerIS, PointerDM, VecScatter,
                                 DMCast, JacobianStructCast, JacobianStruct,
                                 SubMatrixStruct, CallbackDM)
 
@@ -915,10 +915,10 @@ class CoupledObjectBuilder(BaseObjectBuilder):
         objs = self.objs
         targets = self.fielddata.targets
 
-        base_dict['fields'] = IS(
+        base_dict['fields'] = PointerIS(
             name=sreg.make_name(prefix='fields'), nindices=len(targets)
         )
-        base_dict['subdms'] = SubDM(
+        base_dict['subdms'] = PointerDM(
             name=sreg.make_name(prefix='subdms'), nindices=len(targets)
         )
         base_dict['nfields'] = PetscInt(sreg.make_name(prefix='nfields'))

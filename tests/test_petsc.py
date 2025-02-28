@@ -11,7 +11,7 @@ from devito.types import Constant, LocalCompositeObject
 from devito.passes.iet.languages.C import CDataManager
 from devito.petsc.types import (DM, Mat, LocalVec, PetscMPIInt, KSP,
                                 PC, KSPConvergedReason, PETScArray,
-                                LinearSolveExpr)
+                                LinearSolveExpr, FieldData, MultipleFieldData)
 from devito.petsc.solve import PETScSolve, separate_eqn, centre_stencil
 from devito.petsc.iet.nodes import Expression
 
@@ -782,14 +782,19 @@ class TestCoupledLinear:
     # These tests use simple problems to validate functionality, but they help
     # ensure correctness in code generation.
     # TODO: Add more comprehensive tests for fully coupled problems.
+    # TODO: Add subdomain tests, time loop, multiple coupled etc.
 
-    def test_coupled_vs_non_coupled(self):
-        grid = Grid(shape=(11, 11))
+    @skipif('petsc')
+    # NOTE: Coupled mode does not yet support multiple processors, but
+    # it still needs to be tested in a parallel environment
+    @pytest.mark.parallel(mode=[1])
+    def test_coupled_vs_non_coupled(self, mode):
+        grid = Grid(shape=(11, 11), dtype=np.float64)
 
-        e = Function(name='e', grid=grid, space_order=2)
-        f = Function(name='f', grid=grid, space_order=2)
-        g = Function(name='g', grid=grid, space_order=2)
-        h = Function(name='h', grid=grid, space_order=2)
+        e = Function(name='e', grid=grid, space_order=2, dtype=np.float64)
+        f = Function(name='f', grid=grid, space_order=2, dtype=np.float64)
+        g = Function(name='g', grid=grid, space_order=2, dtype=np.float64)
+        h = Function(name='h', grid=grid, space_order=2, dtype=np.float64)
 
         f.data[:] = 5.
         h.data[:] = 5.
@@ -822,17 +827,29 @@ class TestCoupledLinear:
         enorm2 = norm(e)
         gnorm2 = norm(g)
 
-        assert np.isclose(enorm1, enorm2, rtol=1e-5)
-        assert np.isclose(gnorm1, gnorm2, rtol=1e-5)
+        print('enorm1:', enorm1)
+        print('enorm2:', enorm2)
+        assert np.isclose(enorm1, enorm2, rtol=1e-16)
+        assert np.isclose(gnorm1, gnorm2, rtol=1e-16)
 
         callbacks1 = [meta_call.root for meta_call in op1._func_table.values()]
         callbacks2 = [meta_call.root for meta_call in op2._func_table.values()]
 
         # Solving for multiple fields within the same matrix system requires
         # additional machinery and more callback functions
-        assert len(callbacks1) == 7
+        assert len(callbacks1) == 8
         assert len(callbacks2) == 11
 
+        # Check fielddata type
+        fielddata1 = petsc1[0].rhs.fielddata
+        fielddata2 = petsc2[0].rhs.fielddata
+        fielddata3 = petsc3[0].rhs.fielddata
+
+        assert isinstance(fielddata1, FieldData)
+        assert isinstance(fielddata2, FieldData)
+        assert isinstance(fielddata3, MultipleFieldData)
+
+    @skipif('petsc')
     def test_coupled_structs(self):
         grid = Grid(shape=(11, 11))
 
@@ -873,3 +890,136 @@ class TestCoupledLinear:
         # The public `struct UserCtx0` only appears in the header file
         assert 'struct UserCtx0\n{' not in ccode
         assert 'struct UserCtx0\n{' in hcode
+
+    @skipif('petsc')
+    def test_coupled_frees(self):
+        grid = Grid(shape=(11, 11), dtype=np.float64)
+
+        e = Function(name='e', grid=grid, space_order=2)
+        f = Function(name='f', grid=grid, space_order=2)
+        g = Function(name='g', grid=grid, space_order=2)
+        h = Function(name='h', grid=grid, space_order=2)
+
+        eq1 = Eq(e.laplace, h)
+        eq2 = Eq(f.laplace, h)
+        eq3 = Eq(g.laplace, h)
+
+        petsc1 = PETScSolve({e: [eq1], f: [eq2]})
+        petsc2 = PETScSolve({e: [eq1], f: [eq2], g: [eq3]})
+
+        with switchconfig(openmp=False, mpi=True):
+            op1 = Operator(petsc1, opt='noop')
+            op2 = Operator(petsc2, opt='noop')
+
+        frees1 = op1.body.frees
+        frees2 = op2.body.frees
+
+        # Check solver with two fields
+        # IS destroys
+        assert str(frees1[0]) == 'PetscCall(ISDestroy(&(fields0[0])));'
+        assert str(frees1[1]) == 'PetscCall(ISDestroy(&(fields0[1])));'
+        assert str(frees1[2]) == 'PetscCall(PetscFree(fields0));'
+        # Sub DM destroys
+        assert str(frees1[3]) == 'PetscCall(DMDestroy(&(subdms0[0])));'
+        assert str(frees1[4]) == 'PetscCall(DMDestroy(&(subdms0[1])));'
+        assert str(frees1[5]) == 'PetscCall(PetscFree(subdms0));'
+
+        # Check solver with three fields
+        # IS destroys
+        assert str(frees2[0]) == 'PetscCall(ISDestroy(&(fields0[0])));'
+        assert str(frees2[1]) == 'PetscCall(ISDestroy(&(fields0[1])));'
+        assert str(frees2[2]) == 'PetscCall(ISDestroy(&(fields0[2])));'
+        assert str(frees2[3]) == 'PetscCall(PetscFree(fields0));'
+        # Sub DM destroys
+        assert str(frees2[4]) == 'PetscCall(DMDestroy(&(subdms0[0])));'
+        assert str(frees2[5]) == 'PetscCall(DMDestroy(&(subdms0[1])));'
+        assert str(frees2[6]) == 'PetscCall(DMDestroy(&(subdms0[2])));'
+        assert str(frees2[7]) == 'PetscCall(PetscFree(subdms0));'
+
+    @skipif('petsc')
+    def test_dmda_dofs(self):
+        grid = Grid(shape=(11, 11))
+
+        e = Function(name='e', grid=grid, space_order=2)
+        f = Function(name='f', grid=grid, space_order=2)
+        g = Function(name='g', grid=grid, space_order=2)
+        h = Function(name='h', grid=grid, space_order=2)
+
+        eq1 = Eq(e.laplace, h)
+        eq2 = Eq(f.laplace, h)
+        eq3 = Eq(g.laplace, h)
+
+        petsc1 = PETScSolve({e: [eq1]})
+        petsc2 = PETScSolve({e: [eq1], f: [eq2]})
+        petsc3 = PETScSolve({e: [eq1], f: [eq2], g: [eq3]})
+
+        with switchconfig(openmp=False):
+            op1 = Operator(petsc1, opt='noop')
+            op2 = Operator(petsc2, opt='noop')
+            op3 = Operator(petsc3, opt='noop')
+
+        # Check the number of dofs in the DMDA for each field
+        assert 'PetscCall(DMDACreate2d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
+            'DM_BOUNDARY_GHOSTED,DMDA_STENCIL_BOX,11,11,1,1,1,2,NULL,NULL,&(da0)));' \
+            in str(op1)
+
+        assert 'PetscCall(DMDACreate2d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
+            'DM_BOUNDARY_GHOSTED,DMDA_STENCIL_BOX,11,11,1,1,2,2,NULL,NULL,&(da0)));' \
+            in str(op2)
+
+        assert 'PetscCall(DMDACreate2d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
+            'DM_BOUNDARY_GHOSTED,DMDA_STENCIL_BOX,11,11,1,1,3,2,NULL,NULL,&(da0)));' \
+            in str(op3)
+
+    @skipif('petsc')
+    def test_submatrices(self):
+        grid = Grid(shape=(11, 11))
+
+        e = Function(name='e', grid=grid, space_order=2)
+        f = Function(name='f', grid=grid, space_order=2)
+        g = Function(name='g', grid=grid, space_order=2)
+        h = Function(name='h', grid=grid, space_order=2)
+
+        eq1 = Eq(e.laplace, f)
+        eq2 = Eq(g.laplace, h)
+
+        petsc = PETScSolve({e: [eq1], g: [eq2]})
+
+        submatrices = petsc[0].rhs.fielddata.submatrices
+
+        j00 = submatrices.get_submatrix(e, 'J00')
+        j01 = submatrices.get_submatrix(e, 'J01')
+        j10 = submatrices.get_submatrix(g, 'J10')
+        j11 = submatrices.get_submatrix(g, 'J11')
+
+        # Check the number of submatrices
+        assert len(submatrices.submatrix_keys) == 4
+        assert str(submatrices.submatrix_keys) == "['J00', 'J01', 'J10', 'J11']"
+
+        # Technically a non-coupled problem, so the only non-zero submatrices
+        # should be the diagonal ones i.e J00 and J11
+        assert submatrices.nonzero_submatrix_keys == ['J00', 'J11']
+        assert submatrices.get_submatrix(e, 'J01')['matvecs'] is None
+        assert submatrices.get_submatrix(g, 'J10')['matvecs'] is None
+
+        j00 = submatrices.get_submatrix(e, 'J00')
+        j11 = submatrices.get_submatrix(g, 'J11')
+
+        assert str(j00['matvecs'][0]) == 'Eq(y_e(x, y),' \
+            + ' Derivative(x_e(x, y), (x, 2)) + Derivative(x_e(x, y), (y, 2)))'
+
+        assert str(j11['matvecs'][0]) == 'Eq(y_g(x, y),' \
+            + ' Derivative(x_g(x, y), (x, 2)) + Derivative(x_g(x, y), (y, 2)))'
+
+        # Check the derivative wrt fields
+        assert j00['derivative_wrt'] == e
+        assert j01['derivative_wrt'] == g
+        assert j10['derivative_wrt'] == e
+        assert j11['derivative_wrt'] == g
+
+    # TODO:
+    # @skipif('petsc')
+    # def test_create_submats(self):
+
+    # add tests for all new callbacks
+    # def test_create_whole_matmult():
