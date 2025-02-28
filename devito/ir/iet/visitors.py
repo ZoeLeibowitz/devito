@@ -678,6 +678,7 @@ class CGen(Visitor):
 
         candidates = o.parameters + tuple(o._dspace.parts)
         typedecls = [self._gen_struct_decl(i) for i in candidates if xfilter(i)]
+
         for i in o._func_table.values():
             if not i.local:
                 continue
