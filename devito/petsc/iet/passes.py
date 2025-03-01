@@ -88,6 +88,79 @@ def make_core_petsc_calls(objs, **kwargs):
     return call_mpi, BlankLine
 
 
+<<<<<<< HEAD
+=======
+def build_core_objects(grid, **kwargs):
+    """
+    Returns a dict containing shared symbols and objects that are not
+    unique to each PETScSolve.
+
+    Many of these objects are used as arguments in callback functions to make
+    the C code cleaner and more modular. This is also a step toward leveraging
+    Devito's `reuse_efuncs` functionality, allowing reuse of efuncs when
+    they are semantically identical.
+
+    TODO: Further refinement is needed to make use of `reuse_efuncs`. Also,
+    add docs for the objects inside the dict.
+    """
+    if kwargs['options']['mpi']:
+        # TODO: Devito MPI + PETSc testing -> communicator = grid.distributor._obj_comm
+        communicator = 'PETSC_COMM_WORLD'
+    else:
+        communicator = 'PETSC_COMM_SELF'
+
+    subdms = SubDM(name='subdms')
+    fields = IS(name='fields')
+    submats = SubMats(name='submats')
+    rows = IS(name='rows')
+    cols = IS(name='cols')
+
+    return {
+        'size': PetscMPIInt(name='size'),
+        'comm': communicator,
+        'err': PetscErrorCode(name='err'),
+        'grid': grid,
+        'block': CallbackMat('block'),
+        'submat_arr': SubMats(name='submat_arr'),
+        'subblockrows': PetscInt('subblockrows'),
+        'subblockcols': PetscInt('subblockcols'),
+        'rowidx': PetscInt('rowidx'),
+        'colidx': PetscInt('colidx'),
+        'J': Mat('J'),
+        'X': GlobalVec('X'),
+        'xloc': LocalVec('xloc'),
+        'Y': GlobalVec('Y'),
+        'yloc': LocalVec('yloc'),
+        'F': GlobalVec('F'),
+        'floc': LocalVec('floc'),
+        'B': GlobalVec('B'),
+        'nfields': PetscInt('nfields'),
+        'irow': IS(name='irow'),
+        'icol': IS(name='icol'),
+        'nsubmats': Scalar('nsubmats', dtype=np.int32),
+        'matreuse': MatReuse('scall'),
+        'snes': SNES('snes'),
+        'rows': rows,
+        'cols': cols,
+        'Subdms': subdms,
+        'LocalSubdms': CallbackSubDM(name='subdms'),
+        'Fields': fields,
+        'LocalFields': LocalIS(name='fields'),
+        'Submats': submats,
+        'ljacctx': JacobianStruct(
+            fields=[subdms, fields, submats], modifier=' *'
+        ),
+        'subctx': SubMatrixStruct(fields=[rows, cols]),
+        'Null': Macro('NULL'),
+        'dummyctx': Symbol('lctx'),
+        'dummyptr': DummyArg('dummy'),
+        'dummyefunc': Symbol('dummyefunc'),
+        'dof': PetscInt('dof'),
+        'begin_user': c.Line('PetscFunctionBeginUser;'),
+    }
+
+
+>>>>>>> f08c644c4 (fix pytest)
 class Builder:
     """
     This class is designed to support future extensions, enabling
