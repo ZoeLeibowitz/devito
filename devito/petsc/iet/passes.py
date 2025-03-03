@@ -109,8 +109,8 @@ def build_core_objects(grid, **kwargs):
     """
     if kwargs['options']['mpi']:
         # TODO: Devito MPI + PETSc testing -> communicator = grid.distributor._obj_comm
-        # communicator = 'PETSC_COMM_WORLD'
-        communicator = grid.distributor._obj_comm
+        communicator = 'PETSC_COMM_WORLD'
+        # communicator = grid.distributor._obj_comm
     else:
         communicator = 'PETSC_COMM_SELF'
 

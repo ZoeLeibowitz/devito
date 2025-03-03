@@ -787,37 +787,37 @@ class TestCoupledLinear:
     # TODO: Add more comprehensive tests for fully coupled problems.
     # TODO: Add subdomain tests, time loop, multiple coupled etc.
 
-    # @skipif('petsc')
-    # # NOTE: Coupled mode does not yet support multiple processors, but
-    # # it still needs to be tested in a parallel environment
-    # @pytest.mark.parallel(mode=[1])
-    # def test_coupled_vs_non_coupled(self, mode):
-    #     grid = Grid(shape=(11, 11), dtype=np.float64)
+    @skipif('petsc')
+    # NOTE: Coupled mode does not yet support multiple processors, but
+    # it still needs to be tested in a parallel environment
+    @pytest.mark.parallel(mode=[1])
+    def test_coupled_vs_non_coupled(self, mode):
+        grid = Grid(shape=(11, 11), dtype=np.float64)
 
-    #     e = Function(name='e', grid=grid, space_order=2, dtype=np.float64)
-    #     f = Function(name='f', grid=grid, space_order=2, dtype=np.float64)
-    #     g = Function(name='g', grid=grid, space_order=2, dtype=np.float64)
-    #     h = Function(name='h', grid=grid, space_order=2, dtype=np.float64)
+        e = Function(name='e', grid=grid, space_order=2, dtype=np.float64)
+        f = Function(name='f', grid=grid, space_order=2, dtype=np.float64)
+        g = Function(name='g', grid=grid, space_order=2, dtype=np.float64)
+        h = Function(name='h', grid=grid, space_order=2, dtype=np.float64)
 
-    #     f.data[:] = 5.
-    #     h.data[:] = 5.
+        f.data[:] = 5.
+        h.data[:] = 5.
 
-    #     eq1 = Eq(e.laplace, f)
-    #     eq2 = Eq(g.laplace, h)
+        eq1 = Eq(e.laplace, f)
+        eq2 = Eq(g.laplace, h)
 
-    #     # Non-coupled
-    #     petsc1 = PETScSolve(eq1, target=e)
-    #     petsc2 = PETScSolve(eq2, target=g)
-    #     with switchconfig(openmp=False, mpi=True):
-    #         op1 = Operator(petsc1 + petsc2, opt='noop')
-    #     op1.apply()
+        # Non-coupled
+        petsc1 = PETScSolve(eq1, target=e)
+        petsc2 = PETScSolve(eq2, target=g)
+        with switchconfig(openmp=False, mpi=True):
+            op1 = Operator(petsc1 + petsc2, opt='noop')
+        op1.apply()
 
-    #     enorm1 = norm(e)
-    #     gnorm1 = norm(g)
+        enorm1 = norm(e)
+        gnorm1 = norm(g)
 
-    #     # reset
-    #     e.data[:] = 0
-    #     g.data[:] = 0
+        # reset
+        e.data[:] = 0
+        g.data[:] = 0
 
         # Coupled
         # TODO: Need more friendly API for coupled - just
@@ -827,21 +827,21 @@ class TestCoupledLinear:
             op2 = Operator(petsc3, opt='noop')
         op2.apply()
 
-    #     enorm2 = norm(e)
-    #     gnorm2 = norm(g)
+        enorm2 = norm(e)
+        gnorm2 = norm(g)
 
-    #     print('enorm1:', enorm1)
-    #     print('enorm2:', enorm2)
-    #     assert np.isclose(enorm1, enorm2, rtol=1e-16)
-    #     assert np.isclose(gnorm1, gnorm2, rtol=1e-16)
+        print('enorm1:', enorm1)
+        print('enorm2:', enorm2)
+        assert np.isclose(enorm1, enorm2, rtol=1e-16)
+        assert np.isclose(gnorm1, gnorm2, rtol=1e-16)
 
-    #     callbacks1 = [meta_call.root for meta_call in op1._func_table.values()]
-    #     callbacks2 = [meta_call.root for meta_call in op2._func_table.values()]
+        callbacks1 = [meta_call.root for meta_call in op1._func_table.values()]
+        callbacks2 = [meta_call.root for meta_call in op2._func_table.values()]
 
-    #     # Solving for multiple fields within the same matrix system requires
-    #     # additional machinery and more callback functions
-    #     assert len(callbacks1) == 8
-    #     assert len(callbacks2) == 11
+        # Solving for multiple fields within the same matrix system requires
+        # additional machinery and more callback functions
+        assert len(callbacks1) == 8
+        assert len(callbacks2) == 11
 
         # Check fielddata type
         fielddata1 = petsc1[0].rhs.fielddata
@@ -983,8 +983,12 @@ class TestCoupledLinear:
         g = Function(name='g', grid=grid, space_order=2)
         h = Function(name='h', grid=grid, space_order=2)
 
-        eq1 = Eq(e.laplace, f)
-        eq2 = Eq(g.laplace, h)
+        eq1 = Eq(e.laplace, h)
+        eq2 = Eq(f.laplace, h)
+        eq3 = Eq(g.laplace, h)
+
+        petsc1 = PETScSolve({e: [eq1], f: [eq2]})
+        petsc2 = PETScSolve({e: [eq1], f: [eq2], g: [eq3]})
 
         petsc = PETScSolve({e: [eq1], g: [eq2]})
 
