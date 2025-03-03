@@ -9,8 +9,12 @@ from devito.types import Symbol, Scalar
 from devito.petsc.types import (PetscMPIInt, PetscErrorCode, MultipleFieldData,
                                 PointerIS, Mat, LocalVec, GlobalVec, CallbackMat, SNES,
                                 DummyArg, PetscInt, PointerDM, PointerMat, MatReuse,
+<<<<<<< HEAD
                                 CallbackPointerIS, CallbackPointerDM, JacobianStruct,
                                 SubMatrixStruct)
+=======
+                                CallbackPointerIS, CallbackPointerDM, JacobianStruct, SubMatrixStruct)
+>>>>>>> 469f4e26a (change names)
 from devito.petsc.iet.nodes import InjectSolveDummy
 from devito.petsc.utils import core_metadata
 from devito.petsc.iet.routines import (CBBuilder, CCBBuilder, BaseObjectBuilder,
@@ -105,15 +109,16 @@ def build_core_objects(grid, **kwargs):
     """
     if kwargs['options']['mpi']:
         # TODO: Devito MPI + PETSc testing -> communicator = grid.distributor._obj_comm
-        communicator = 'PETSC_COMM_WORLD'
+        # communicator = 'PETSC_COMM_WORLD'
+        communicator = grid.distributor._obj_comm
     else:
         communicator = 'PETSC_COMM_SELF'
 
-    subdms = SubDM(name='subdms')
-    fields = IS(name='fields')
-    submats = SubMats(name='submats')
-    rows = IS(name='rows')
-    cols = IS(name='cols')
+    subdms = PointerDM(name='subdms')
+    fields = PointerIS(name='fields')
+    submats = PointerMat(name='submats')
+    rows = PointerIS(name='rows')
+    cols = PointerIS(name='cols')
 
     return {
         'size': PetscMPIInt(name='size'),
@@ -121,7 +126,7 @@ def build_core_objects(grid, **kwargs):
         'err': PetscErrorCode(name='err'),
         'grid': grid,
         'block': CallbackMat('block'),
-        'submat_arr': SubMats(name='submat_arr'),
+        'submat_arr': PointerMat(name='submat_arr'),
         'subblockrows': PetscInt('subblockrows'),
         'subblockcols': PetscInt('subblockcols'),
         'rowidx': PetscInt('rowidx'),
@@ -135,17 +140,17 @@ def build_core_objects(grid, **kwargs):
         'floc': LocalVec('floc'),
         'B': GlobalVec('B'),
         'nfields': PetscInt('nfields'),
-        'irow': IS(name='irow'),
-        'icol': IS(name='icol'),
+        'irow': PointerIS(name='irow'),
+        'icol': PointerIS(name='icol'),
         'nsubmats': Scalar('nsubmats', dtype=np.int32),
         'matreuse': MatReuse('scall'),
         'snes': SNES('snes'),
         'rows': rows,
         'cols': cols,
         'Subdms': subdms,
-        'LocalSubdms': CallbackSubDM(name='subdms'),
+        'LocalSubdms': CallbackPointerDM(name='subdms'),
         'Fields': fields,
-        'LocalFields': LocalIS(name='fields'),
+        'LocalFields': CallbackPointerIS(name='fields'),
         'Submats': submats,
         'ljacctx': JacobianStruct(
             fields=[subdms, fields, submats], modifier=' *'
