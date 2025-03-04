@@ -775,10 +775,6 @@ def test_time_loop():
     assert body4.count('ctx0.t0 = t0') == 1
 
 
-# @skipif('petsc')
-# def test_():
-
-
 class TestCoupledLinear:
     # The coupled interface can be used even for uncoupled problems, meaning
     # the equations will be solved within a single matrix system.
