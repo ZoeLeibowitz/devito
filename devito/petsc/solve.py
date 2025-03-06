@@ -57,11 +57,18 @@ class InjectSolve:
         )
         matvecs = [self.build_matvec_eqns(eq, target, arrays) for eq in eqns]
 
+        initialguess = [
+            eq for eq in
+            (self.make_initial_guess(e, target, arrays) for e in eqns)
+            if eq is not None
+        ]
+
         return FieldData(
             target=target,
             matvecs=matvecs,
             formfuncs=formfuncs,
             formrhs=formrhs,
+            initialguess=initialguess,
             arrays=arrays
         )
 
@@ -116,6 +123,19 @@ class InjectSolve:
                 arrays['b'], b,
                 subdomain=eq.subdomain
             )
+
+    def make_initial_guess(self, eq, target, arrays):
+        """
+        Enforces initial guess satisfies essential BCs.
+        """
+        if isinstance(eq, EssentialBC):
+            assert eq.lhs == target
+            return Eq(
+                arrays['x'], eq.rhs,
+                subdomain=eq.subdomain
+            )
+        else:
+            return None
 
     def generate_arrays(self, target):
         return {

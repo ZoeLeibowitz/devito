@@ -72,8 +72,6 @@ for n in n_values:
     rhs.data[:] = np.float64(2.0*X*(Y-1.0)*(Y - 2.0*X + X*Y + 2.0)) * np.float64(np.exp(X-Y))
 
     # # Create boundary condition expressions using subdomains
-    x, y = grid.dimensions
-
     bcs = [EssentialBC(phi, np.float64(0.), subdomain=sub1)]
     bcs += [EssentialBC(phi, np.float64(0.), subdomain=sub2)]
     bcs += [EssentialBC(phi, np.float64(0.), subdomain=sub3)]
