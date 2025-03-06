@@ -4,11 +4,12 @@ import pytest
 
 from conftest import skipif
 from devito import (Grid, Function, TimeFunction, Eq, Operator, switchconfig,
-                    norm)
+                    norm, SubDomain)
 from devito.ir.iet import (Call, ElementalFunction, Definition, DummyExpr,
                            FindNodes, retrieve_iteration_tree)
 from devito.types import Constant, LocalCompositeObject
 from devito.passes.iet.languages.C import CDataManager
+from devito.petsc import EssentialBC
 from devito.petsc.types import (DM, Mat, LocalVec, PetscMPIInt, KSP,
                                 PC, KSPConvergedReason, PETScArray,
                                 LinearSolveExpr, FieldData, MultipleFieldData)
@@ -256,14 +257,14 @@ def test_dmda_create():
         op2 = Operator(petsc2, opt='noop')
         op3 = Operator(petsc3, opt='noop')
 
-    assert 'PetscCall(DMDACreate1d(PETSC_COMM_WORLD,DM_BOUNDARY_GHOSTED,' + \
+    assert 'PetscCall(DMDACreate1d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
         '2,1,2,NULL,&(da0)));' in str(op1)
 
-    assert 'PetscCall(DMDACreate2d(PETSC_COMM_WORLD,DM_BOUNDARY_GHOSTED,' + \
+    assert 'PetscCall(DMDACreate2d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
         'DM_BOUNDARY_GHOSTED,DMDA_STENCIL_BOX,2,2,1,1,1,4,NULL,NULL,&(da0)));' \
         in str(op2)
 
-    assert 'PetscCall(DMDACreate3d(PETSC_COMM_WORLD,DM_BOUNDARY_GHOSTED,' + \
+    assert 'PetscCall(DMDACreate3d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
         'DM_BOUNDARY_GHOSTED,DM_BOUNDARY_GHOSTED,DMDA_STENCIL_BOX,6,5,4' + \
         ',1,1,1,1,6,NULL,NULL,NULL,&(da0)));' in str(op3)
 
@@ -623,7 +624,7 @@ def test_apply(mode):
     with switchconfig(openmp=False, mpi=True):
         op = Operator(petsc)
 
-    # Check the Operator runs without errors
+    # Check the Operator runs without errors.
     op.apply()
 
     # Verify that users can override `mu`
@@ -775,6 +776,102 @@ def test_time_loop():
     assert body4.count('ctx0.t0 = t0') == 1
 
 
+@skipif('petsc')
+@pytest.mark.parallel(mode=[2, 4, 8])
+def test_solve_output(mode):
+    """
+    Verify that PETScSolve returns the correct output for
+    simple cases e.g with the identity matrix.
+    """
+    grid = Grid(shape=(11, 11), dtype=np.float64)
+
+    u = Function(name='u', grid=grid, space_order=2, dtype=np.float64)
+    v = Function(name='v', grid=grid, space_order=2, dtype=np.float64)
+
+    # Solving Ax=b where A is the identity matrix
+    v.data[:] = 5.0
+    eqn = Eq(u, v)
+    petsc = PETScSolve(eqn, target=u)
+
+    with switchconfig(openmp=False, mpi=True):
+        op = Operator(petsc)
+
+    # Check the solve function returns the correct output
+    op.apply()
+    assert np.allclose(u.data, v.data)
+
+
+@skipif('petsc')
+@pytest.mark.parallel(mode=[2, 4, 8])
+def test_essential_bcs(mode):
+    """
+    Verify that PETScSolve returns the correct output with
+    essential boundary conditions.
+    """
+    # Subdomains to implement BCs
+    class SubTop(SubDomain):
+        name = 'subtop'
+
+        def define(self, dimensions):
+            x, y = dimensions
+            return {x: x, y: ('right', 1)}
+    sub1 = SubTop()
+
+    class SubBottom(SubDomain):
+        name = 'subbottom'
+
+        def define(self, dimensions):
+            x, y = dimensions
+            return {x: x, y: ('left', 1)}
+    sub2 = SubBottom()
+
+    class SubLeft(SubDomain):
+        name = 'subleft'
+
+        def define(self, dimensions):
+            x, y = dimensions
+            return {x: ('left', 1), y: y}
+    sub3 = SubLeft()
+
+    class SubRight(SubDomain):
+        name = 'subright'
+
+        def define(self, dimensions):
+            x, y = dimensions
+            return {x: ('right', 1), y: y}
+    sub4 = SubRight()
+
+    subdomains = (sub1, sub2, sub3, sub4)
+    grid = Grid(shape=(11, 11), subdomains=subdomains, dtype=np.float64)
+
+    u = Function(name='u', grid=grid, space_order=2, dtype=np.float64)
+    v = Function(name='v', grid=grid, space_order=2, dtype=np.float64)
+
+    # Solving Ax=b where A is the identity matrix
+    v.data[:] = 5.0
+    eqn = Eq(u, v)
+
+    bcs = [EssentialBC(u, 1., subdomain=sub1)]  # top
+    bcs += [EssentialBC(u, 2., subdomain=sub2)]  # bottom
+    bcs += [EssentialBC(u, 3., subdomain=sub3)]  # left
+    bcs += [EssentialBC(u, 4., subdomain=sub4)]  # right
+
+    petsc = PETScSolve([eqn]+bcs, target=u)
+
+    with switchconfig(openmp=False, mpi=True):
+        op = Operator(petsc)
+
+    op.apply()
+
+    # Check u is equal to v on the interior
+    assert np.allclose(u.data[1:-1, 1:-1], v.data[1:-1, 1:-1])
+    # Check u satisfies the boundary conditions
+    assert np.allclose(u.data[1:-1, -1], 1.0)  # top
+    assert np.allclose(u.data[1:-1, 0], 2.0)  # bottom
+    assert np.allclose(u.data[0, 1:-1], 3.0)  # left
+    assert np.allclose(u.data[-1, 1:-1], 4.0)  # right
+
+
 class TestCoupledLinear:
     # The coupled interface can be used even for uncoupled problems, meaning
     # the equations will be solved within a single matrix system.
@@ -816,7 +913,7 @@ class TestCoupledLinear:
         g.data[:] = 0
 
         # Coupled
-        # TODO: Need more friendly API for coupled - just
+        # TODO: Need to think of a more friendly API for coupled - just
         # using a dict for now
         petsc3 = PETScSolve({e: [eq1], g: [eq2]})
         with switchconfig(openmp=False, mpi=True):
@@ -958,15 +1055,15 @@ class TestCoupledLinear:
             op3 = Operator(petsc3, opt='noop')
 
         # Check the number of dofs in the DMDA for each field
-        assert 'PetscCall(DMDACreate2d(PETSC_COMM_WORLD,DM_BOUNDARY_GHOSTED,' + \
+        assert 'PetscCall(DMDACreate2d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
             'DM_BOUNDARY_GHOSTED,DMDA_STENCIL_BOX,11,11,1,1,1,2,NULL,NULL,&(da0)));' \
             in str(op1)
 
-        assert 'PetscCall(DMDACreate2d(PETSC_COMM_WORLD,DM_BOUNDARY_GHOSTED,' + \
+        assert 'PetscCall(DMDACreate2d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
             'DM_BOUNDARY_GHOSTED,DMDA_STENCIL_BOX,11,11,1,1,2,2,NULL,NULL,&(da0)));' \
             in str(op2)
 
-        assert 'PetscCall(DMDACreate2d(PETSC_COMM_WORLD,DM_BOUNDARY_GHOSTED,' + \
+        assert 'PetscCall(DMDACreate2d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
             'DM_BOUNDARY_GHOSTED,DMDA_STENCIL_BOX,11,11,1,1,3,2,NULL,NULL,&(da0)));' \
             in str(op3)
 
@@ -979,12 +1076,8 @@ class TestCoupledLinear:
         g = Function(name='g', grid=grid, space_order=2)
         h = Function(name='h', grid=grid, space_order=2)
 
-        eq1 = Eq(e.laplace, h)
-        eq2 = Eq(f.laplace, h)
-        eq3 = Eq(g.laplace, h)
-
-        petsc1 = PETScSolve({e: [eq1], f: [eq2]})
-        petsc2 = PETScSolve({e: [eq1], f: [eq2], g: [eq3]})
+        eq1 = Eq(e.laplace, f)
+        eq2 = Eq(g.laplace, h)
 
         petsc = PETScSolve({e: [eq1], g: [eq2]})
 
