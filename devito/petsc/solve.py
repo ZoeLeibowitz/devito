@@ -345,4 +345,3 @@ def get_funcs(eqns):
 
 localinfo = DMDALocalInfo(name='info', liveness='eager')
 prefixes = ['y', 'x', 'f', 'b']
-lhs = Symbol('PETSc')

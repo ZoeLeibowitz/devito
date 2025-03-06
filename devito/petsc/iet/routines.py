@@ -25,16 +25,15 @@ class CBBuilder:
     """
     Build IET routines to generate PETSc callback functions.
     """
-    def __init__(self, injectsolve, objs, solver_objs, timedep,
-                 rcompile=None, sregistry=None, concretize_mapper={}, **kwargs):
+    def __init__(self, **kwargs):
 
-        self.rcompile = rcompile
-        self.sregistry = sregistry
-        self.concretize_mapper = concretize_mapper
-        self.timedep = timedep
-        self.objs = objs
-        self.solver_objs = solver_objs
-        self.injectsolve = injectsolve
+        self.rcompile = kwargs.get('rcompile', None)
+        self.sregistry = kwargs.get('sregistry', None)
+        self.concretize_mapper = kwargs.get('concretize_mapper', {})
+        self.timedep = kwargs.get('timedep')
+        self.objs = kwargs.get('objs')
+        self.solver_objs = kwargs.get('solver_objs')
+        self.injectsolve = kwargs.get('injectsolve')
 
         self._efuncs = OrderedDict()
         self._struct_params = []
@@ -44,7 +43,7 @@ class CBBuilder:
         self._user_struct_callback = None
         self._matvecs = {}
         self._formfuncs = []
-        self._formrhss = []
+        self._formrhs = []
 
         self._make_core()
         self._efuncs = self._uxreplace_efuncs()
@@ -66,7 +65,7 @@ class CBBuilder:
         """
         This is the matvec callback associated with the whole Jacobian i.e
         is set in the main kernel via
-        `PetscCall(MatShellSetOperation(J,MATOP_MULT,(void (*)(void))MyMatShellMult));`
+        `PetscCall(MatShellSetOperation(J,MATOP_MULT,(void (*)(void))...));`
         """
         return next(iter(self._matvecs.values()))
 
@@ -83,8 +82,8 @@ class CBBuilder:
         return self._formfuncs
 
     @property
-    def formrhss(self):
-        return self._formrhss
+    def formrhs(self):
+        return self._formrhs
 
     @property
     def user_struct_callback(self):
@@ -97,7 +96,6 @@ class CBBuilder:
         self._make_formrhs(fielddata)
         self._make_user_struct_callback()
 
-    # TODO: probs don't need to pass in fielddata?
     def _make_matvec(self, fielddata, matvecs, prefix='MatMult'):
         # Compile matvec `eqns` into an IET via recursive compilation
         irs_matvec, _ = self.rcompile(matvecs,
@@ -128,8 +126,6 @@ class CBBuilder:
 
         fields = self._dummy_fields(body)
 
-        # TODO: maybe this shouldn't be attached to the fielddata -> think about this
-        # currently it's attched to both i think
         y_matvec = fielddata.arrays['y']
         x_matvec = fielddata.arrays['x']
 
@@ -390,7 +386,7 @@ class CBBuilder:
             retval=objs['err'],
             parameters=(sobjs['callbackdm'], objs['B'])
         )
-        self._formrhss.append(cb)
+        self._formrhs.append(cb)
         self._efuncs[cb.name] = cb
 
     def _create_form_rhs_body(self, body, fielddata):
@@ -530,10 +526,9 @@ class CBBuilder:
 
 
 class CCBBuilder(CBBuilder):
-    def __init__(self, injectsolve, objs, solver_objs, timedep, **kwargs):
-        # TODO: probs move this after the super init?
+    def __init__(self, **kwargs):
         self._submatrices_callback = None
-        super().__init__(injectsolve, objs, solver_objs, timedep, **kwargs)
+        super().__init__(**kwargs)
 
     @property
     def submatrices_callback(self):
@@ -642,9 +637,7 @@ class CCBBuilder(CBBuilder):
 
     def _make_whole_formfunc(self):
         objs = self.objs
-
-        # obvs improve name
-        body = self._create_whole_formfunc_callback_body()
+        body = self._whole_formfunc_body()
 
         cb = PETScCallable(
             self.sregistry.make_name(prefix='WholeFormFunc'),
@@ -655,11 +648,10 @@ class CCBBuilder(CBBuilder):
         self._main_formfunc_callback = cb
         self._efuncs[cb.name] = cb
 
-    def _create_whole_formfunc_callback_body(self):
+    def _whole_formfunc_body(self):
         objs = self.objs
         sobjs = self.solver_objs
 
-        # TODO: replace obvs
         ljacctx = objs['ljacctx']
         struct_cast = DummyExpr(ljacctx, JacobianStructCast(objs['dummyptr']))
         X = objs['X']
@@ -711,7 +703,6 @@ class CCBBuilder(CBBuilder):
         self._submatrices_callback = cb
         self._efuncs[cb.name] = cb
 
-    # TODO: obvs improve these names
     def _create_submat_callback_body(self):
         objs = self.objs
         sobjs = self.solver_objs
@@ -730,7 +721,6 @@ class CCBBuilder(CBBuilder):
 
         get_ctx = petsc_call('MatShellGetContext', [objs['J'], Byref(objs['ljacctx'])])
 
-        # TODO: Not sure if I should use global or local dimensions yet
         Null = objs['Null']
         dm_get_info = petsc_call(
             'DMDAGetInfo', [
@@ -845,17 +835,16 @@ class BaseObjectBuilder:
     Designed to be extended by subclasses, which can override the `_extend_build`
     method to support specific use cases.
     """
-
-    def __init__(self, injectsolve, baseobjs, sregistry=None, **kwargs):
-        self.injectsolve = injectsolve
-        self.objs = baseobjs
-        self.sregistry = sregistry
-        self.fielddata = injectsolve.expr.rhs.fielddata
+    def __init__(self, **kwargs):
+        self.injectsolve = kwargs.get('injectsolve')
+        self.objs = kwargs.get('objs')
+        self.sregistry = kwargs.get('sregistry')
+        self.fielddata = self.injectsolve.expr.rhs.fielddata
         self.solver_objs = self._build()
 
     def _build(self):
         """
-        # TODO: update docts to reflect new/changes objs
+        # TODO: update docs
         Constructs the core dictionary of solver objects and allows
         subclasses to extend or modify it via `_extend_build`.
         Returns:
@@ -948,8 +937,6 @@ class CoupledObjectBuilder(BaseObjectBuilder):
                 name=f'{key}ctx',
                 fields=objs['subctx'].fields,
             )
-
-            # not sure if it should be global or local yet
             base_dict[f'{key}X'] = LocalVec(f'{key}X')
             base_dict[f'{key}Y'] = LocalVec(f'{key}Y')
             base_dict[f'{key}F'] = LocalVec(f'{key}F')
@@ -992,11 +979,11 @@ class CoupledObjectBuilder(BaseObjectBuilder):
 
 
 class BaseSetup:
-    def __init__(self, injectsolve, objs, solver_objs, cbbuilder, **kwargs):
-        self.injectsolve = injectsolve
-        self.objs = objs
-        self.solver_objs = solver_objs
-        self.cbbuilder = cbbuilder
+    def __init__(self, **kwargs):
+        self.injectsolve = kwargs.get('injectsolve')
+        self.objs = kwargs.get('objs')
+        self.solver_objs = kwargs.get('solver_objs')
+        self.cbbuilder = kwargs.get('cbbuilder')
         self.calls = self._setup()
 
     @property
@@ -1021,7 +1008,7 @@ class BaseSetup:
 
         create_matrix = petsc_call('DMCreateMatrix', [dmda, Byref(sobjs['Jac'])])
 
-        # NOTE: Assuming all solves are linear for now.
+        # NOTE: Assuming all solves are linear for now
         snes_set_type = petsc_call('SNESSetType', [sobjs['snes'], 'SNESKSPONLY'])
 
         snes_set_jac = petsc_call(
@@ -1077,7 +1064,7 @@ class BaseSetup:
             self.cbbuilder.user_struct_callback.name, [Byref(mainctx)]
         )
 
-        # TODO: check - maybe I don't need to explictly set this
+        # TODO: maybe don't need to explictly set this
         mat_set_dm = petsc_call('MatSetDM', [sobjs['Jac'], dmda])
 
         calls_set_app_ctx = petsc_call('DMSetApplicationContext', [dmda, Byref(mainctx)])
@@ -1158,7 +1145,6 @@ class BaseSetup:
 
 
 class CoupledSetup(BaseSetup):
-
     @property
     def snes_ctx(self):
         return Byref(self.solver_objs['jacctx'])
@@ -1196,7 +1182,6 @@ class CoupledSetup(BaseSetup):
              Byref(FieldFromComposite(objs['Submats'].base, sobjs['jacctx']))]
         )
 
-        # probs shouldn't be here but..
         targets = self.injectsolve.expr.rhs.fielddata.targets
 
         deref_dms = [
@@ -1224,14 +1209,13 @@ class CoupledSetup(BaseSetup):
 
 
 class Solver:
-    def __init__(self, injectsolve, objs, solver_objs, iters, cbbuilder,
-                 timedep, **kwargs):
-        self.injectsolve = injectsolve
-        self.objs = objs
-        self.solver_objs = solver_objs
-        self.iters = iters
-        self.cbbuilder = cbbuilder
-        self.timedep = timedep
+    def __init__(self, **kwargs):
+        self.injectsolve = kwargs.get('injectsolve')
+        self.objs = kwargs.get('objs')
+        self.solver_objs = kwargs.get('solver_objs')
+        self.iters = kwargs.get('iters')
+        self.cbbuilder = kwargs.get('cbbuilder')
+        self.timedep = kwargs.get('timedep')
 
         self.calls = self._execute_solve()
         self.spatial_body = self._spatial_loop_nest()
@@ -1250,7 +1234,7 @@ class Solver:
 
         struct_assignment = self.timedep.assign_time_iters(sobjs['userctx'])
 
-        rhs_callback = self.cbbuilder.formrhss.pop()
+        rhs_callback = self.cbbuilder.formrhs.pop()
 
         dmda = sobjs['dmda']
 
@@ -1305,13 +1289,14 @@ class CoupledSolver(Solver):
 
         struct_assignment = self.timedep.assign_time_iters(sobjs['userctx'])
 
-        rhs_callbacks = self.cbbuilder.formrhss
+        rhs_callbacks = self.cbbuilder.formrhs
 
         xglob = sobjs['xglobal']
         bglob = sobjs['bglobal']
 
         targets = self.injectsolve.expr.rhs.fielddata.targets
 
+        # TODO: optimise the ccode generated here
         pre_solve = ()
         post_solve = ()
 
@@ -1383,13 +1368,13 @@ class CoupledSolver(Solver):
 
 
 class NonTimeDependent:
-    def __init__(self, injectsolve, iters, solver_objs, **kwargs):
-        self.injectsolve = injectsolve
-        self.iters = iters
-        self.sobjs = solver_objs
+    def __init__(self, **kwargs):
+        self.injectsolve = kwargs.get('injectsolve')
+        self.iters = kwargs.get('iters')
+        self.sobjs = kwargs.get('solver_objs')
         self.kwargs = kwargs
-        self.origin_to_moddim = self._origin_to_moddim_mapper(iters)
-        self.time_idx_to_symb = injectsolve.expr.rhs.time_mapper
+        self.origin_to_moddim = self._origin_to_moddim_mapper(self.iters)
+        self.time_idx_to_symb = self.injectsolve.expr.rhs.time_mapper
 
     def _origin_to_moddim_mapper(self, iters):
         return {}
@@ -1453,23 +1438,9 @@ class TimeDependent(NonTimeDependent):
     - Modulo dimensions are updated in the matrix context struct at each time
       step and can be accessed in the callback functions where needed.
     """
-    # TODO: move these funcs/properties around
-
-    def is_target_time(self, target):
-        return any(i.is_Time for i in target.dimensions)
-
     @property
     def time_spacing(self):
         return self.injectsolve.expr.rhs.grid.stepping_dim.spacing
-
-    def target_time(self, target):
-        target_time = [
-            i for i, d in zip(target.indices, target.dimensions)
-            if d.is_Time
-        ]
-        assert len(target_time) == 1
-        target_time = target_time.pop()
-        return target_time
 
     @property
     def symb_to_moddim(self):
@@ -1482,6 +1453,18 @@ class TimeDependent(NonTimeDependent):
             for k, v in self.time_idx_to_symb.items()
         }
         return {symb: self.origin_to_moddim[mapper[symb]] for symb in mapper}
+
+    def is_target_time(self, target):
+        return any(i.is_Time for i in target.dimensions)
+
+    def target_time(self, target):
+        target_time = [
+            i for i, d in zip(target.indices, target.dimensions)
+            if d.is_Time
+        ]
+        assert len(target_time) == 1
+        target_time = target_time.pop()
+        return target_time
 
     def uxreplace_time(self, body):
         return Uxreplace(self.symb_to_moddim).visit(body)

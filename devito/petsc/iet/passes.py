@@ -34,7 +34,7 @@ def lower_petsc(iet, **kwargs):
     if len(unique_grids) > 1:
         raise ValueError("All PETScSolves must use the same Grid, but multiple found.")
     grid = unique_grids.pop()
-    objs = build_core_objects(grid, **kwargs)
+    objs.update({'grid': grid})
 
     # Create core PETSc calls (not specific to each PETScSolve)
     core = make_core_petsc_calls(objs, **kwargs)
@@ -88,77 +88,6 @@ def make_core_petsc_calls(objs, **kwargs):
     return call_mpi, BlankLine
 
 
-def build_core_objects(grid, **kwargs):
-    """
-    Returns a dict containing shared symbols and objects that are not
-    unique to each PETScSolve.
-
-    Many of these objects are used as arguments in callback functions to make
-    the C code cleaner and more modular. This is also a step toward leveraging
-    Devito's `reuse_efuncs` functionality, allowing reuse of efuncs when
-    they are semantically identical.
-
-    TODO: Further refinement is needed to make use of `reuse_efuncs`. Also,
-    add docs for the objects inside the dict.
-    """
-    if kwargs['options']['mpi']:
-        # TODO: Devito MPI + PETSc testing -> communicator = grid.distributor._obj_comm
-        communicator = 'PETSC_COMM_WORLD'
-        # communicator = grid.distributor._obj_comm
-    else:
-        communicator = 'PETSC_COMM_SELF'
-
-    subdms = PointerDM(name='subdms')
-    fields = PointerIS(name='fields')
-    submats = PointerMat(name='submats')
-    rows = PointerIS(name='rows')
-    cols = PointerIS(name='cols')
-
-    return {
-        'size': PetscMPIInt(name='size'),
-        'comm': communicator,
-        'err': PetscErrorCode(name='err'),
-        'grid': grid,
-        'block': CallbackMat('block'),
-        'submat_arr': PointerMat(name='submat_arr'),
-        'subblockrows': PetscInt('subblockrows'),
-        'subblockcols': PetscInt('subblockcols'),
-        'rowidx': PetscInt('rowidx'),
-        'colidx': PetscInt('colidx'),
-        'J': Mat('J'),
-        'X': GlobalVec('X'),
-        'xloc': LocalVec('xloc'),
-        'Y': GlobalVec('Y'),
-        'yloc': LocalVec('yloc'),
-        'F': GlobalVec('F'),
-        'floc': LocalVec('floc'),
-        'B': GlobalVec('B'),
-        'nfields': PetscInt('nfields'),
-        'irow': PointerIS(name='irow'),
-        'icol': PointerIS(name='icol'),
-        'nsubmats': Scalar('nsubmats', dtype=np.int32),
-        'matreuse': MatReuse('scall'),
-        'snes': SNES('snes'),
-        'rows': rows,
-        'cols': cols,
-        'Subdms': subdms,
-        'LocalSubdms': CallbackPointerDM(name='subdms'),
-        'Fields': fields,
-        'LocalFields': CallbackPointerIS(name='fields'),
-        'Submats': submats,
-        'ljacctx': JacobianStruct(
-            fields=[subdms, fields, submats], modifier=' *'
-        ),
-        'subctx': SubMatrixStruct(fields=[rows, cols]),
-        'Null': Macro('NULL'),
-        'dummyctx': Symbol('lctx'),
-        'dummyptr': DummyArg('dummy'),
-        'dummyefunc': Symbol('dummyefunc'),
-        'dof': PetscInt('dof'),
-        'begin_user': c.Line('PetscFunctionBeginUser;'),
-    }
-
-
 class Builder:
     """
     This class is designed to support future extensions, enabling
@@ -175,65 +104,51 @@ class Builder:
         self.kwargs = kwargs
 
         self.coupled = isinstance(injectsolve.expr.rhs.fielddata, MultipleFieldData)
+        self.args = {
+            'injectsolve': self.injectsolve,
+            'objs': self.objs,
+            'iters': self.iters,
+            **self.kwargs
+        }
 
         self.objbuilder = self._object_builder()
+        self.args['solver_objs'] = self.objbuilder.solver_objs
+
         self.timedep = self._time_dependency()
+        self.args['timedep'] = self.timedep
+
         self.cbbuilder = self._callback_builder()
+        self.args['cbbuilder'] = self.cbbuilder
+
         self.solversetup = self._setup()
         self.solve = self._solver_execution()
 
     def _object_builder(self):
-        args = (self.injectsolve, self.objs)
         return (
-            CoupledObjectBuilder(*args, **self.kwargs)
+            CoupledObjectBuilder(**self.args)
             if self.coupled else
-            BaseObjectBuilder(*args, **self.kwargs)
+            BaseObjectBuilder(**self.args)
         )
 
     def _time_dependency(self):
         time_mapper = self.injectsolve.expr.rhs.time_mapper
         timedep_class = TimeDependent if time_mapper else NonTimeDependent
-        return timedep_class(
-            self.injectsolve, self.iters, self.objbuilder.solver_objs, **self.kwargs
-        )
+        return timedep_class(**self.args)
 
     def _callback_builder(self):
-        sobjs = self.objbuilder.solver_objs
-        args = (self.injectsolve, self.objs, sobjs, self.timedep)
-        return (
-            CCBBuilder(*args, **self.kwargs)
-            if self.coupled else
-            CBBuilder(*args, **self.kwargs)
-        )
+        return (CCBBuilder(**self.args) if self.coupled else CBBuilder(**self.args))
 
     def _setup(self):
-        sobjs = self.objbuilder.solver_objs
-        args = (self.injectsolve, self.objs, sobjs, self.cbbuilder)
-        return (
-            CoupledSetup(*args, **self.kwargs)
-            if self.coupled else
-            BaseSetup(*args, **self.kwargs)
-        )
+        return (CoupledSetup(**self.args) if self.coupled else BaseSetup(**self.args))
 
     def _solver_execution(self):
-        sobjs = self.objbuilder.solver_objs
-        args = (
-            self.injectsolve, self.objs, sobjs,
-            self.iters, self.cbbuilder, self.timedep
-        )
-        return (
-            CoupledSolver(*args)
-            if self.coupled else
-            Solver(*args)
-        )
+        return (CoupledSolver(**self.args) if self.coupled else Solver(**self.args))
 
 
 def populate_matrix_context(efuncs, objs):
     name = 'PopulateMatContext'
 
-    try:
-        efuncs[name]
-    except KeyError:
+    if name not in efuncs:
         return
 
     subdms_expr = DummyExpr(
@@ -253,3 +168,63 @@ def populate_matrix_context(efuncs, objs):
         name, body, objs['err'],
         parameters=[objs['ljacctx'], objs['Subdms'], objs['Fields']]
     )
+
+
+# TODO: Devito MPI + PETSc testing
+# if kwargs['options']['mpi'] -> communicator = grid.distributor._obj_comm
+communicator = 'PETSC_COMM_WORLD'
+subdms = PointerDM(name='subdms')
+fields = PointerIS(name='fields')
+submats = PointerMat(name='submats')
+rows = PointerIS(name='rows')
+cols = PointerIS(name='cols')
+
+
+# A static dict containing shared symbols and objects that are not
+# unique to each PETScSolve.
+# Many of these objects are used as arguments in callback functions to make
+# the C code cleaner and more modular. This is also a step toward leveraging
+# Devito's `reuse_efuncs` functionality, allowing reuse of efuncs when
+# they are semantically identical.
+objs = {
+    'size': PetscMPIInt(name='size'),
+    'comm': communicator,
+    'err': PetscErrorCode(name='err'),
+    'block': CallbackMat('block'),
+    'submat_arr': PointerMat(name='submat_arr'),
+    'subblockrows': PetscInt('subblockrows'),
+    'subblockcols': PetscInt('subblockcols'),
+    'rowidx': PetscInt('rowidx'),
+    'colidx': PetscInt('colidx'),
+    'J': Mat('J'),
+    'X': GlobalVec('X'),
+    'xloc': LocalVec('xloc'),
+    'Y': GlobalVec('Y'),
+    'yloc': LocalVec('yloc'),
+    'F': GlobalVec('F'),
+    'floc': LocalVec('floc'),
+    'B': GlobalVec('B'),
+    'nfields': PetscInt('nfields'),
+    'irow': PointerIS(name='irow'),
+    'icol': PointerIS(name='icol'),
+    'nsubmats': Scalar('nsubmats', dtype=np.int32),
+    'matreuse': MatReuse('scall'),
+    'snes': SNES('snes'),
+    'rows': rows,
+    'cols': cols,
+    'Subdms': subdms,
+    'LocalSubdms': CallbackPointerDM(name='subdms'),
+    'Fields': fields,
+    'LocalFields': CallbackPointerIS(name='fields'),
+    'Submats': submats,
+    'ljacctx': JacobianStruct(
+        fields=[subdms, fields, submats], modifier=' *'
+    ),
+    'subctx': SubMatrixStruct(fields=[rows, cols]),
+    'Null': Macro('NULL'),
+    'dummyctx': Symbol('lctx'),
+    'dummyptr': DummyArg('dummy'),
+    'dummyefunc': Symbol('dummyefunc'),
+    'dof': PetscInt('dof'),
+    'begin_user': c.Line('PetscFunctionBeginUser;'),
+}

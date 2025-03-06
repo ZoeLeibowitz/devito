@@ -196,17 +196,6 @@ class SingleIS(LocalObject):
 
 class PETScStruct(LocalCompositeObject):
 
-    __rargs__ = ('name', 'pname', 'fields')
-
-    def __init__(self, name, pname, fields, modifier=None, liveness='lazy'):
-        pfields = [(i._C_name, i._C_ctype) for i in fields]
-        super().__init__(name, pname, pfields, modifier, liveness)
-        self._fields = fields
-
-    @property
-    def fields(self):
-        return self._fields
-
     @property
     def time_dim_fields(self):
         """
@@ -225,16 +214,6 @@ class PETScStruct(LocalCompositeObject):
         return [f for f in self.fields if f not in self.time_dim_fields]
 
     _C_modifier = ' *'
-
-    # TODO: maybe this should move to LocalCompositeObject itself
-    @property
-    def _fields_(self):
-        return [(i._C_name, i._C_ctype) for i in self.fields]
-
-    # IMPROVE: this is because of the use inside iet/visitors struct decl
-    @property
-    def __name__(self):
-        return self.pname
 
 
 class JacobianStruct(PETScStruct):

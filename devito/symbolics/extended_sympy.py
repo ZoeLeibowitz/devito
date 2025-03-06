@@ -854,9 +854,8 @@ class VOID(Cast):
     _base_typ = 'void'
 
 
-# this should use CastStar -> fix
-class VOIDP(Cast):
-    _base_typ = 'void*'
+class VOIDP(CastStar):
+    base = VOID
 
 
 class CHARP(CastStar):

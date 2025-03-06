@@ -247,15 +247,24 @@ class LocalCompositeObject(CompositeObject, LocalType):
     Object with composite type (e.g., a C struct) defined in C.
     """
 
-    __rargs__ = ('name', 'pname', 'pfields')
+    __rargs__ = ('name', 'pname', 'fields')
 
-    def __init__(self, name, pname, pfields, modifier=None, liveness='lazy'):
+    def __init__(self, name, pname, fields, modifier=None, liveness='lazy'):
         dtype = CustomDtype('struct %s' % pname, modifier=modifier)
         Object.__init__(self, name, dtype, None)
         self._pname = pname
         assert liveness in ['eager', 'lazy']
         self._liveness = liveness
+        self._fields = fields
+
+    @property
+    def fields(self):
+        return self._fields
 
     @property
     def _fields_(self):
-        return self.fields
+        return [(i._C_name, i._C_ctype) for i in self.fields]
+
+    @property
+    def __name__(self):
+        return self.pname
