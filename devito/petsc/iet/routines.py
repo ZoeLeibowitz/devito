@@ -552,8 +552,6 @@ class CCBBuilder(CBBuilder):
         return self._main_formfunc_callback
 
     def _make_core(self):
-        # let's just start by generating the diagonal sub matrices,
-        # then will extend to off diags
         injectsolve = self.injectsolve
         targets = injectsolve.expr.rhs.fielddata.targets
         all_fielddata = injectsolve.expr.rhs.fielddata
@@ -578,7 +576,7 @@ class CCBBuilder(CBBuilder):
         objs = self.objs
 
         # obvs improve name
-        body = self._create_whole_matvec_callback_body()
+        body = self._whole_matvec_body()
 
         cb = PETScCallable(
             self.sregistry.make_name(prefix='WholeMatMult'),
@@ -589,7 +587,7 @@ class CCBBuilder(CBBuilder):
         self._main_matvec_callback = cb
         self._efuncs[cb.name] = cb
 
-    def _create_whole_matvec_callback_body(self):
+    def _whole_matvec_body(self):
         objs = self.objs
         sobjs = self.solver_objs
 
@@ -684,7 +682,7 @@ class CCBBuilder(CBBuilder):
         )
 
     def _create_submatrices(self):
-        body = self._create_submat_callback_body()
+        body = self._submat_callback_body()
         objs = self.objs
         params = (
             objs['J'],
@@ -703,7 +701,7 @@ class CCBBuilder(CBBuilder):
         self._submatrices_callback = cb
         self._efuncs[cb.name] = cb
 
-    def _create_submat_callback_body(self):
+    def _submat_callback_body(self):
         objs = self.objs
         sobjs = self.solver_objs
 

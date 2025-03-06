@@ -623,8 +623,7 @@ def test_apply(mode):
     with switchconfig(openmp=False, mpi=True):
         op = Operator(petsc)
 
-    # Check the Operator runs without errors. Not verifying output for
-    # now. Need to consolidate BC implementation
+    # Check the Operator runs without errors
     op.apply()
 
     # Verify that users can override `mu`
@@ -817,7 +816,7 @@ class TestCoupledLinear:
         g.data[:] = 0
 
         # Coupled
-        # TODO: Need to think of a more friendly API for coupled - just
+        # TODO: Need more friendly API for coupled - just
         # using a dict for now
         petsc3 = PETScSolve({e: [eq1], g: [eq2]})
         with switchconfig(openmp=False, mpi=True):
