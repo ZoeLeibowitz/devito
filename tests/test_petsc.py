@@ -257,14 +257,14 @@ def test_dmda_create():
         op2 = Operator(petsc2, opt='noop')
         op3 = Operator(petsc3, opt='noop')
 
-    assert 'PetscCall(DMDACreate1d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
+    assert 'PetscCall(DMDACreate1d(PETSC_COMM_WORLD,DM_BOUNDARY_GHOSTED,' + \
         '2,1,2,NULL,&(da0)));' in str(op1)
 
-    assert 'PetscCall(DMDACreate2d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
+    assert 'PetscCall(DMDACreate2d(PETSC_COMM_WORLD,DM_BOUNDARY_GHOSTED,' + \
         'DM_BOUNDARY_GHOSTED,DMDA_STENCIL_BOX,2,2,1,1,1,4,NULL,NULL,&(da0)));' \
         in str(op2)
 
-    assert 'PetscCall(DMDACreate3d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
+    assert 'PetscCall(DMDACreate3d(PETSC_COMM_WORLD,DM_BOUNDARY_GHOSTED,' + \
         'DM_BOUNDARY_GHOSTED,DM_BOUNDARY_GHOSTED,DMDA_STENCIL_BOX,6,5,4' + \
         ',1,1,1,1,6,NULL,NULL,NULL,&(da0)));' in str(op3)
 
@@ -624,7 +624,7 @@ def test_apply(mode):
     with switchconfig(openmp=False, mpi=True):
         op = Operator(petsc)
 
-    # Check the Operator runs without errors.
+    # Check the Operator runs without errors
     op.apply()
 
     # Verify that users can override `mu`
@@ -913,7 +913,7 @@ class TestCoupledLinear:
         g.data[:] = 0
 
         # Coupled
-        # TODO: Need to think of a more friendly API for coupled - just
+        # TODO: Need more friendly API for coupled - just
         # using a dict for now
         petsc3 = PETScSolve({e: [eq1], g: [eq2]})
         with switchconfig(openmp=False, mpi=True):
@@ -1055,15 +1055,15 @@ class TestCoupledLinear:
             op3 = Operator(petsc3, opt='noop')
 
         # Check the number of dofs in the DMDA for each field
-        assert 'PetscCall(DMDACreate2d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
+        assert 'PetscCall(DMDACreate2d(PETSC_COMM_WORLD,DM_BOUNDARY_GHOSTED,' + \
             'DM_BOUNDARY_GHOSTED,DMDA_STENCIL_BOX,11,11,1,1,1,2,NULL,NULL,&(da0)));' \
             in str(op1)
 
-        assert 'PetscCall(DMDACreate2d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
+        assert 'PetscCall(DMDACreate2d(PETSC_COMM_WORLD,DM_BOUNDARY_GHOSTED,' + \
             'DM_BOUNDARY_GHOSTED,DMDA_STENCIL_BOX,11,11,1,1,2,2,NULL,NULL,&(da0)));' \
             in str(op2)
 
-        assert 'PetscCall(DMDACreate2d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
+        assert 'PetscCall(DMDACreate2d(PETSC_COMM_WORLD,DM_BOUNDARY_GHOSTED,' + \
             'DM_BOUNDARY_GHOSTED,DMDA_STENCIL_BOX,11,11,1,1,3,2,NULL,NULL,&(da0)));' \
             in str(op3)
 

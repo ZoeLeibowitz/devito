@@ -179,11 +179,6 @@ class InjectSolveNested(InjectSolve):
             # Set submatrix only if there's at least one non-zero matvec
             if any(m is not None for m in matvecs):
                 jacobian.set_submatrix(target, submat, matvecs)
-    
-    def generate_field_data(self, eqns, target, arrays):
-        formfuncs, formrhs = zip(
-            *[self.build_function_eqns(eq, target, arrays) for eq in eqns]
-        )
 
     def generate_field_data(self, eqns, target, arrays):
         formfuncs, formrhs = zip(

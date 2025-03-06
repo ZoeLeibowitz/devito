@@ -1473,7 +1473,6 @@ class NonTimeDependent:
 
     def replace_array(self, target):
         """
-        TODO: UPDATE DOCS
         VecReplaceArray() is a PETSc function that allows replacing the array
         of a `Vec` with a user provided array.
         https://petsc.org/release/manualpages/Vec/VecReplaceArray/

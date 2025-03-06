@@ -240,15 +240,6 @@ class SubMatrices:
                     'derivative_wrt': self.targets[j],
                     'index': i * num_targets + j
                 }
-<<<<<<< HEAD
-<<<<<<< HEAD
-
-=======
-        
->>>>>>> 3b77b8944 (compiler: Re-write init for Builder)
-=======
-
->>>>>>> f46491c98 (flake8)
         return submatrices
 
     @property
