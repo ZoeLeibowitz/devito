@@ -26,10 +26,11 @@ class CBBuilder:
     Build IET routines to generate PETSc callback functions.
     """
     def __init__(self, injectsolve, objs, solver_objs, timedep,
-                 rcompile=None, sregistry=None, **kwargs):
+                 rcompile=None, sregistry=None, concretize_mapper={}, **kwargs):
 
         self.rcompile = rcompile
         self.sregistry = sregistry
+        self.concretize_mapper = concretize_mapper
         self.timedep = timedep
         self.objs = objs
         self.solver_objs = solver_objs
@@ -100,7 +101,8 @@ class CBBuilder:
     def _make_matvec(self, fielddata, matvecs, prefix='MatMult'):
         # Compile matvec `eqns` into an IET via recursive compilation
         irs_matvec, _ = self.rcompile(matvecs,
-                                      options={'mpi': False}, sregistry=self.sregistry)
+                                      options={'mpi': False}, sregistry=self.sregistry,
+                                      concretize_mapper=self.concretize_mapper)
         body_matvec = self._create_matvec_body(List(body=irs_matvec.uiet.body),
                                                fielddata)
 
@@ -241,7 +243,8 @@ class CBBuilder:
         formfuncs = fielddata.formfuncs
         # Compile formfunc `eqns` into an IET via recursive compilation
         irs_formfunc, _ = self.rcompile(
-            formfuncs, options={'mpi': False}, sregistry=self.sregistry
+            formfuncs, options={'mpi': False}, sregistry=self.sregistry,
+            concretize_mapper=self.concretize_mapper
         )
         body_formfunc = self._create_formfunc_body(
             List(body=irs_formfunc.uiet.body), fielddata
@@ -374,7 +377,8 @@ class CBBuilder:
 
         # Compile formrhs `eqns` into an IET via recursive compilation
         irs_formrhs, _ = self.rcompile(
-            formrhs, options={'mpi': False}, sregistry=self.sregistry
+            formrhs, options={'mpi': False}, sregistry=self.sregistry,
+            concretize_mapper=self.concretize_mapper
         )
         body_formrhs = self._create_form_rhs_body(
             List(body=irs_formrhs.uiet.body), fielddata
