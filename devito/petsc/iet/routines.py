@@ -1290,6 +1290,7 @@ class CoupledSetup(BaseSetup):
             create_submats
         ) + tuple(deref_dms) + tuple(xglobals) + tuple(bglobals)
 
+
 class Solver:
     def __init__(self, **kwargs):
         self.injectsolve = kwargs.get('injectsolve')

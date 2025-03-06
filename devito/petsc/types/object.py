@@ -55,6 +55,7 @@ class CallbackMat(LocalObject):
 
 class Mat(LocalObject):
     dtype = CustomDtype('Mat')
+
     @property
     def _C_free(self):
         return petsc_call('MatDestroy', [Byref(self.function)])

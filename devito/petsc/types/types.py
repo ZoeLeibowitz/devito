@@ -240,6 +240,7 @@ class SubMatrices:
                     'derivative_wrt': self.targets[j],
                     'index': i * num_targets + j
                 }
+
         return submatrices
 
     @property

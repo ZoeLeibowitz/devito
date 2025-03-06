@@ -146,6 +146,7 @@ class InjectSolve:
             for p in prefixes
         }
 
+
 class InjectSolveNested(InjectSolve):
     def linear_solve_args(self):
         combined_eqns = [eq for eqns in self.target_eqns.values() for eq in eqns]
