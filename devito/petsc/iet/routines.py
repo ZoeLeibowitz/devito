@@ -641,6 +641,7 @@ class CCBBuilder(CBBuilder):
         targets = injectsolve.expr.rhs.fielddata.targets
         all_fielddata = injectsolve.expr.rhs.fielddata
 
+        # TODO: Add _make_initialguess to coupled make_core
         for t in targets:
             data = all_fielddata.get_field_data(t)
             self._make_formfunc(data)
