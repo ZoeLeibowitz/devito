@@ -2,8 +2,16 @@ import sympy
 
 from devito.tools import Reconstructable, sympy_mutex
 
+# class Initialize(sympy.Function, Reconstructable):
+#     pass
 
-class LinearSolveExpr(sympy.Function, Reconstructable):
+class MetaData(sympy.Function, Reconstructable):
+    pass
+
+class Initialize(MetaData):
+    pass
+
+class LinearSolveExpr(MetaData):
     """
     A symbolic expression passed through the Operator, containing the metadata
     needed to execute a linear solver. Linear problems are handled with

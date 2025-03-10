@@ -1,10 +1,10 @@
 import cgen as c
 
 from devito.passes.iet.engine import iet_pass
-from devito.ir.iet import Transformer, MapNodes, Iteration, BlankLine
+from devito.ir.iet import Transformer, MapNodes, Iteration, BlankLine, FindNodes
 from devito.symbolics import Byref, Macro
 from devito.petsc.types import (PetscMPIInt, PetscErrorCode)
-from devito.petsc.iet.nodes import InjectSolveDummy
+from devito.petsc.iet.nodes import PetscMetaData
 from devito.petsc.utils import core_metadata
 from devito.petsc.iet.routines import (CallbackBuilder, BaseObjectBuilder, BaseSetup,
                                        Solver, TimeDependent, NonTimeDependent)
@@ -13,12 +13,16 @@ from devito.petsc.iet.utils import petsc_call, petsc_call_mpi
 
 @iet_pass
 def lower_petsc(iet, **kwargs):
-    # Check if PETScSolve was used
-    injectsolve_mapper = MapNodes(Iteration, InjectSolveDummy,
-                                  'groupby').visit(iet)
 
+    init = FindNodes(PetscMetaData).visit(iet)
+    # Check if PETScSolve was used
+    injectsolve_mapper = MapNodes(Iteration, PetscMetaData,
+                                  'groupby').visit(iet)
+    from IPython import embed; embed()
     if not injectsolve_mapper:
         return iet, {}
+
+    metadata = core_metadata()
 
     targets = [i.expr.rhs.target for (i,) in injectsolve_mapper.values()]
     init = init_petsc(**kwargs)
@@ -52,7 +56,6 @@ def lower_petsc(iet, **kwargs):
         frees=(petsc_call('PetscFinalize', []),)
     )
     iet = iet._rebuild(body=body)
-    metadata = core_metadata()
     metadata.update({'efuncs': tuple(efuncs.values())})
 
     return iet, metadata

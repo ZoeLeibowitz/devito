@@ -1,5 +1,8 @@
-from devito import *
+from devito import Grid, Function, Eq, Operator, switchconfig
+from devito.types import Symbol
+from devito.types.equation import PetscEq
 from devito.petsc import PETScSolve
+from devito.petsc.types import LinearSolveExpr, Initialize
 import pandas as pd
 from devito import configuration
 import numpy as np
@@ -10,7 +13,15 @@ configuration['opt'] = 'noop'
 # Ensure that PetscInitialize and PetscFinalize are called
 # only once per script, rather than for each Operator constructed.
 
-n_values = [11, 13, 15]
+init = Symbol(name='petscinit')
+
+op_init = Operator([PetscEq(init, Initialize(init))])
+
+print(op_init.ccode)
+
+
+# n_values = [11, 13, 15]
+n_values = [11]
 
 for n in n_values:
     grid = Grid(shape=(n, n), dtype=np.float64)
@@ -28,6 +39,6 @@ for n in n_values:
     with switchconfig(openmp=False):
         op = Operator(petsc)
 
-    op.apply()
+    # op.apply()
 
 print(op.ccode)
