@@ -1,6 +1,7 @@
-from functools import singledispatch
+from functools import singledispatch, cached_property
 
 import sympy
+import numpy as np
 
 from devito.finite_differences.differentiable import Mul
 from devito.finite_differences.derivative import Derivative
@@ -29,6 +30,11 @@ class InjectSolve:
         self.time_mapper = None
         self.target_eqns = target_eqns
 
+    # TODO: Add tests for the compatible scaling
+    @cached_property
+    def scaling(self):
+        return np.prod(self.grid.spacing_symbols)
+
     def build_eq(self):
         target, funcs, fielddata = self.linear_solve_args()
         # Placeholder equation for inserting calls to the solver
@@ -44,6 +50,7 @@ class InjectSolve:
     def linear_solve_args(self):
         target, eqns = next(iter(self.target_eqns.items()))
         eqns = as_tuple(eqns)
+        self.grid = target.grid
 
         funcs = get_funcs(eqns)
         self.time_mapper = generate_time_mapper(funcs)
@@ -95,7 +102,7 @@ class InjectSolve:
         else:
             return Eq(
                 arrays['y'],
-                F_target.subs(targets_to_arrays(arrays['x'], targets)),
+                F_target.subs(targets_to_arrays(arrays['x'], targets))*self.scaling,
                 subdomain=eq.subdomain
             )
 
@@ -108,7 +115,7 @@ class InjectSolve:
         else:
             return Eq(
                 arrays['f'],
-                F_target.subs(targets_to_arrays(arrays['x'], targets)),
+                F_target.subs(targets_to_arrays(arrays['x'], targets))*self.scaling,
                 subdomain=eq.subdomain
             )
 
@@ -120,7 +127,7 @@ class InjectSolve:
             )
         else:
             return Eq(
-                arrays['b'], b,
+                arrays['b'], b*self.scaling,
                 subdomain=eq.subdomain
             )
 
@@ -154,6 +161,11 @@ class InjectSolveNested(InjectSolve):
         self.time_mapper = generate_time_mapper(funcs)
 
         targets = list(self.target_eqns.keys())
+        unique_grids = {i.grid for i in targets}
+        if len(unique_grids) > 1:
+            raise ValueError("All targets within a single "
+                             "PETScSolve must use the same Grid.")
+        self.grid = unique_grids.pop()
         jacobian = SubMatrices(targets)
 
         all_data = MultipleFieldData(jacobian)
