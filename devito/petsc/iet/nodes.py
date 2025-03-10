@@ -10,13 +10,6 @@ class PetscMetaData(Expression):
         super().__init__(expr, pragmas=pragmas, operation=operation)
 
 
-# class InjectSolveDummy(PetscMetaData):
-#     """
-#     Placeholder expression to run the iterative solver.
-#     """
-#     pass
-
-
 class PETScCallable(FixedArgsCallable):
     pass
 
