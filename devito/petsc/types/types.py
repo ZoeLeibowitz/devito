@@ -2,14 +2,18 @@ import sympy
 
 from devito.tools import Reconstructable, sympy_mutex
 
-# class Initialize(sympy.Function, Reconstructable):
-#     pass
 
 class MetaData(sympy.Function, Reconstructable):
     pass
 
+
 class Initialize(MetaData):
     pass
+
+
+class Finalize(MetaData):
+    pass
+
 
 class LinearSolveExpr(MetaData):
     """

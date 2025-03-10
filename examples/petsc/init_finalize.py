@@ -2,7 +2,7 @@ from devito import Grid, Function, Eq, Operator, switchconfig
 from devito.types import Symbol
 from devito.types.equation import PetscEq
 from devito.petsc import PETScSolve
-from devito.petsc.types import LinearSolveExpr, Initialize
+from devito.petsc.types import LinearSolveExpr, Initialize, Finalize
 import pandas as pd
 from devito import configuration
 import numpy as np
@@ -13,32 +13,14 @@ configuration['opt'] = 'noop'
 # Ensure that PetscInitialize and PetscFinalize are called
 # only once per script, rather than for each Operator constructed.
 
-init = Symbol(name='petscinit')
+s = Symbol(name='s')
+with switchconfig(openmp=False, mpi=True):
+    op_init = Operator([PetscEq(s, Initialize(s))], name='kernel_init')
+    op_finalize = Operator([PetscEq(s, Finalize(s))], name='kernel_finalize')
 
-op_init = Operator([PetscEq(init, Initialize(init))])
+# currently this runs with DEVITO_MPI=0
+op_init.apply()
+op_finalize.apply()
 
 print(op_init.ccode)
-
-
-# n_values = [11, 13, 15]
-n_values = [11]
-
-for n in n_values:
-    grid = Grid(shape=(n, n), dtype=np.float64)
-
-    phi = Function(name='phi', grid=grid, space_order=2, dtype=np.float64)
-
-    rhs = Function(name='rhs', grid=grid, space_order=2, dtype=np.float64)
-
-    eqn = Eq(rhs, phi.laplace, subdomain=grid.interior)
-
-    rhs.data[:] = np.float64(5.0)
-
-    petsc = PETScSolve(eqn, target=phi)
-
-    with switchconfig(openmp=False):
-        op = Operator(petsc)
-
-    # op.apply()
-
-print(op.ccode)
+print(op_finalize.ccode)

@@ -1,9 +1,9 @@
 import cgen as c
 
 from devito.passes.iet.engine import iet_pass
-from devito.ir.iet import Transformer, MapNodes, Iteration, BlankLine, FindNodes
+from devito.ir.iet import Transformer, MapNodes, Iteration, BlankLine, FindNodes, Call, CallableBody
 from devito.symbolics import Byref, Macro
-from devito.petsc.types import (PetscMPIInt, PetscErrorCode)
+from devito.petsc.types import (PetscMPIInt, PetscErrorCode, Initialize, Finalize)
 from devito.petsc.iet.nodes import PetscMetaData
 from devito.petsc.utils import core_metadata
 from devito.petsc.iet.routines import (CallbackBuilder, BaseObjectBuilder, BaseSetup,
@@ -13,16 +13,19 @@ from devito.petsc.iet.utils import petsc_call, petsc_call_mpi
 
 @iet_pass
 def lower_petsc(iet, **kwargs):
-
-    init = FindNodes(PetscMetaData).visit(iet)
+    
     # Check if PETScSolve was used
     injectsolve_mapper = MapNodes(Iteration, PetscMetaData,
                                   'groupby').visit(iet)
-    from IPython import embed; embed()
+
     if not injectsolve_mapper:
         return iet, {}
 
     metadata = core_metadata()
+
+    trivial_op = initialize_finalize(iet)
+    if trivial_op:
+        return trivial_op, metadata
 
     targets = [i.expr.rhs.target for (i,) in injectsolve_mapper.values()]
     init = init_petsc(**kwargs)
@@ -59,6 +62,30 @@ def lower_petsc(iet, **kwargs):
     metadata.update({'efuncs': tuple(efuncs.values())})
 
     return iet, metadata
+
+
+def initialize_finalize(iet):
+    data = FindNodes(PetscMetaData).visit(iet)
+
+    init = [i for i in data if isinstance(i.expr.rhs, Initialize)]
+    finalize = [i for i in data if isinstance(i.expr.rhs, Finalize)]
+
+    if init:
+        init_body = petsc_call('PetscInitialize', [Null, Null, Null, Null])
+        init_body = CallableBody(
+            body=(petsc_func_begin_user, init_body),
+            retstmt=(Call('PetscFunctionReturn', arguments=[0]),)
+        )
+        return iet._rebuild(body=init_body)
+    elif finalize:
+        finalize_body = petsc_call('PetscFinalize', [])
+        finalize_body = CallableBody(
+            body=(petsc_func_begin_user, finalize_body),
+            retstmt=(Call('PetscFunctionReturn', arguments=[0]),)
+        )
+        return iet._rebuild(body=finalize_body)
+    else:
+        return None
 
 
 def init_petsc(**kwargs):
