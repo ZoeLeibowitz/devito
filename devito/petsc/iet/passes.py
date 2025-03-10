@@ -1,7 +1,8 @@
 import cgen as c
 
 from devito.passes.iet.engine import iet_pass
-from devito.ir.iet import Transformer, MapNodes, Iteration, BlankLine, FindNodes, Call, CallableBody
+from devito.ir.iet import (Transformer, MapNodes, Iteration, BlankLine,
+                           FindNodes, Call, CallableBody)
 from devito.symbolics import Byref, Macro
 from devito.petsc.types import (PetscMPIInt, PetscErrorCode, Initialize, Finalize)
 from devito.petsc.iet.nodes import PetscMetaData
@@ -13,7 +14,6 @@ from devito.petsc.iet.utils import petsc_call, petsc_call_mpi
 
 @iet_pass
 def lower_petsc(iet, **kwargs):
-    
     # Check if PETScSolve was used
     injectsolve_mapper = MapNodes(Iteration, PetscMetaData,
                                   'groupby').visit(iet)

@@ -1,12 +1,7 @@
-from devito import Grid, Function, Eq, Operator, switchconfig
+from devito import Operator, switchconfig, configuration
 from devito.types import Symbol
 from devito.types.equation import PetscEq
-from devito.petsc import PETScSolve
-from devito.petsc.types import LinearSolveExpr, Initialize, Finalize
-import pandas as pd
-from devito import configuration
-import numpy as np
-import sympy
+from devito.petsc.types import Initialize, Finalize
 configuration['opt'] = 'noop'
 
 

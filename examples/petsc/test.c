@@ -1,8 +1,5 @@
-/* Portions of this code are under:
-   Copyright (C) 2022 Advanced Micro Devices, Inc. All rights reserved.
-*/
-static char help[] = "";
 
+static char help[] = "";
 
 #include <petscsnes.h>
 #include <petscdm.h>
