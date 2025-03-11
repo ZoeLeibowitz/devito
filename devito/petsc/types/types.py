@@ -4,7 +4,15 @@ from devito.tools import Reconstructable, sympy_mutex
 
 
 class MetaData(sympy.Function, Reconstructable):
-    pass
+    def __new__(cls, expr, **kwargs):
+        with sympy_mutex:
+            obj = sympy.Function.__new__(cls, expr)
+        obj._expr = expr
+        return obj
+
+    @property
+    def expr(self):
+        return self._expr
 
 
 class Initialize(MetaData):

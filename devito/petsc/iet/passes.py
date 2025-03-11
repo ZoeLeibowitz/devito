@@ -28,7 +28,6 @@ def lower_petsc(iet, **kwargs):
         return trivial_op, metadata
 
     targets = [i.expr.rhs.target for (i,) in injectsolve_mapper.values()]
-    init = init_petsc(**kwargs)
 
     # Assumption is that all targets have the same grid so can use any target here
     objs = build_core_objects(targets[-1], **kwargs)
@@ -54,10 +53,7 @@ def lower_petsc(iet, **kwargs):
     iet = Transformer(subs).visit(iet)
 
     body = core + tuple(setup) + (BlankLine,) + iet.body.body
-    body = iet.body._rebuild(
-        init=init, body=body,
-        frees=(petsc_call('PetscFinalize', []),)
-    )
+    body = iet.body._rebuild(body=body)
     iet = iet._rebuild(body=body)
     metadata.update({'efuncs': tuple(efuncs.values())})
 
@@ -71,13 +67,20 @@ def initialize_finalize(iet):
     finalize = [i for i in data if isinstance(i.expr.rhs, Finalize)]
 
     if init:
-        init_body = petsc_call('PetscInitialize', [Null, Null, Null, Null])
+        assert len(init) == 1
+        init = init.pop()
+        argc = init.expr.rhs.expr[0]
+        argv = init.expr.rhs.expr[1]
+
+        init_body = petsc_call('PetscInitialize', [Byref(argc), Byref(argv), Null, Null])
+        # init_body = petsc_call('PetscInitialize', [Byref(argc), Null, Null, Null])
         init_body = CallableBody(
             body=(petsc_func_begin_user, init_body),
             retstmt=(Call('PetscFunctionReturn', arguments=[0]),)
         )
         return iet._rebuild(body=init_body)
     elif finalize:
+        assert len(finalize) == 1
         finalize_body = petsc_call('PetscFinalize', [])
         finalize_body = CallableBody(
             body=(petsc_func_begin_user, finalize_body),
@@ -86,17 +89,6 @@ def initialize_finalize(iet):
         return iet._rebuild(body=finalize_body)
     else:
         return None
-
-
-def init_petsc(**kwargs):
-    # Initialize PETSc -> for now, assuming all solver options have to be
-    # specified via the parameters dict in PETScSolve
-    # TODO: Are users going to be able to use PETSc command line arguments?
-    # In firedrake, they have an options_prefix for each solver, enabling the use
-    # of command line options
-    initialize = petsc_call('PetscInitialize', [Null, Null, Null, Null])
-
-    return petsc_func_begin_user, initialize
 
 
 def make_core_petsc_calls(objs, **kwargs):
