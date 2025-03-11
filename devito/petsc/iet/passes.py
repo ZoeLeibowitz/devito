@@ -73,7 +73,7 @@ def initialize_finalize(iet):
         argv = init.expr.rhs.expr[1]
 
         init_body = petsc_call('PetscInitialize', [Byref(argc), Byref(argv), Null, Null])
-        # init_body = petsc_call('PetscInitialize', [Byref(argc), Null, Null, Null])
+        # init_body = petsc_call('PetscInitialize', [Null, Null, Null, Null])
         init_body = CallableBody(
             body=(petsc_func_begin_user, init_body),
             retstmt=(Call('PetscFunctionReturn', arguments=[0]),)

@@ -13,32 +13,43 @@ configuration['opt'] = 'noop'
 import sys; 
 
 
-argcc = len(sys.argv)
+argcc = len(sys.argv)-1
 argv = sys.argv
+argv = argv[1:]
 
+
+# b_string1 = argv.encode('utf-8')
+encoded_strings = [s.encode('utf-8') for s in argv]
+# argtypes = [ctypes.c_char_p] * len(encoded_strings)
+
+argv = (ctypes.POINTER(ctypes.c_char) * len(encoded_strings))()
+
+# Assign each encoded string as a pointer in the array
+for i, b_string in enumerate(encoded_strings):
+    argv[i] = ctypes.cast(b_string, ctypes.POINTER(ctypes.c_char))
+
+
+# from IPython import embed; embed()
 # Ensure that PetscInitialize and PetscFinalize are called
 # only once per script, rather than for each Operator constructed.
 
-
-# argc
-# array of strings ()
-
-c_dtype = CustomDtype('char',  modifier=' **')
 
 dummy = Symbol(name='d')
 # argc_symb = Constant(name='argc', dtype=np.int32, is_const=False)
 
 
 # argv_type = ctypes.POINTER(ctypes.c_char_p)
+# argv_type = ctypes.c_char_p
 argv_type = ctypes.POINTER(ctypes.POINTER(c_char))
 
-
-
+class argv_symbol(DataSymbol):
+    @property
+    def _C_ctype(self):
+        return argv_type
 
 argc_symb = DataSymbol(name='argc', dtype=np.int32)
-argv_symb = DataSymbol(name='argv', dtype=argv_type)
+argv_symb = argv_symbol(name='argv')
 
-# argv_type = ctypes.POINTER(ctypes.POINTER(c_char))
 
 # from IPython import embed; embed()
 
@@ -60,6 +71,9 @@ with switchconfig(openmp=False, mpi=True):
 
 
 # from IPython import embed; embed()
+# argv = (ctypes.c_char_p * argcc)(*[s.encode('utf-8') for s in argv])
+# from IPython import embed; embed()
+
 op_init.apply(argc=argcc, argv=argv)
 # op_finalize.apply()
 
