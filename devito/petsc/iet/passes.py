@@ -1,15 +1,13 @@
 import cgen as c
-
-import ctypes
+import numpy as np
 
 from devito.passes.iet.engine import iet_pass
 from devito.ir.iet import (Transformer, MapNodes, Iteration, BlankLine,
-                           FindNodes, Call, CallableBody, DummyExpr)
-from devito.symbolics import Byref, Macro, String
+                           FindNodes, Call, CallableBody)
+from devito.symbolics import Byref, Macro
 from devito.types.basic import DataSymbol
-from devito.petsc.types import (PetscMPIInt, PetscErrorCode, Initialize, Finalize,
-                                )
-from devito.types import Object
+from devito.petsc.types import (PetscMPIInt, PetscErrorCode, Initialize, Finalize, ArgvSymbol)
+from devito.petsc.types.macros import petsc_func_begin_user
 from devito.petsc.iet.nodes import PetscMetaData
 from devito.petsc.utils import core_metadata
 from devito.petsc.iet.routines import (CallbackBuilder, BaseObjectBuilder, BaseSetup,
@@ -27,7 +25,7 @@ def lower_petsc(iet, **kwargs):
         return iet, {}
 
     metadata = core_metadata()
-    
+
     # initialize or finalize
     data = FindNodes(PetscMetaData).visit(iet)
 
@@ -39,10 +37,10 @@ def lower_petsc(iet, **kwargs):
     #     return trivial_op, metadata
 
     if any(filter(lambda i: isinstance(i.expr.rhs, Initialize), data)):
-        return initialize(data), metadata
+        return initialize(iet), metadata
 
     if any(filter(lambda i: isinstance(i.expr.rhs, Finalize), data)):
-        return finalize(data), metadata
+        return finalize(iet), metadata
 
     targets = [i.expr.rhs.target for (i,) in injectsolve_mapper.values()]
 
@@ -77,13 +75,13 @@ def lower_petsc(iet, **kwargs):
     return iet, metadata
 
 
-def initialize(data):
-    assert len(data) == 1
-    data = data.pop()
+def initialize(iet):
+    # assert len(data) == 1
+    # data = data.pop()
 
-    # int because the correct type for argc is a C int
+    # should be int because the correct type for argc is a C int
     # and not a int32
-    argc = DataSymbol(name='argc', dtype=int)
+    argc = DataSymbol(name='argc', dtype=np.int32)
     argv = ArgvSymbol(name='argv')
     Help = Macro('help')
 
@@ -97,8 +95,8 @@ def initialize(data):
     return iet._rebuild(body=init_body)
 
 
-def finalize(data):
-    assert len(data) == 1
+def finalize(iet):
+    # assert len(data) == 1
     finalize_body = petsc_call('PetscFinalize', [])
     finalize_body = CallableBody(
         body=(petsc_func_begin_user, finalize_body),

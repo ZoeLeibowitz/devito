@@ -1,4 +1,4 @@
-from ctypes import POINTER
+from ctypes import POINTER, c_char
 
 from devito.tools import CustomDtype, dtype_to_cstr
 from devito.types import LocalObject, CCompositeObject, ModuloDimension, TimeDimension
