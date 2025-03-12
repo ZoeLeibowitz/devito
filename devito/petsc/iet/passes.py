@@ -1,10 +1,14 @@
 import cgen as c
 
+import ctypes
+
 from devito.passes.iet.engine import iet_pass
 from devito.ir.iet import (Transformer, MapNodes, Iteration, BlankLine,
-                           FindNodes, Call, CallableBody)
-from devito.symbolics import Byref, Macro
-from devito.petsc.types import (PetscMPIInt, PetscErrorCode, Initialize, Finalize)
+                           FindNodes, Call, CallableBody, DummyExpr)
+from devito.symbolics import Byref, Macro, String
+from devito.petsc.types import (PetscMPIInt, PetscErrorCode, Initialize, Finalize,
+                                )
+from devito.types import Object
 from devito.petsc.iet.nodes import PetscMetaData
 from devito.petsc.utils import core_metadata
 from devito.petsc.iet.routines import (CallbackBuilder, BaseObjectBuilder, BaseSetup,
@@ -72,10 +76,11 @@ def initialize_finalize(iet):
         argc = init.expr.rhs.expr[0]
         argv = init.expr.rhs.expr[1]
 
-        init_body = petsc_call('PetscInitialize', [Byref(argc), Byref(argv), Null, Null])
-        # init_body = petsc_call('PetscInitialize', [Null, Null, Null, Null])
+        tmp = c.Line("static char help[] = \"This is help text.\";")
+        
+        init_body = petsc_call('PetscInitialize', [Byref(argc), Byref(argv), Null, Help])
         init_body = CallableBody(
-            body=(petsc_func_begin_user, init_body),
+            body=(petsc_func_begin_user, tmp, init_body),
             retstmt=(Call('PetscFunctionReturn', arguments=[0]),)
         )
         return iet._rebuild(body=init_body)
@@ -151,6 +156,7 @@ class Builder:
 
 
 Null = Macro('NULL')
+Help = Macro('help')
 void = 'void'
 
 

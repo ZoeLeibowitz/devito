@@ -15,9 +15,8 @@ configuration['opt'] = 'noop'
 # Ensure that PetscInitialize and PetscFinalize are called
 # only once per script, rather than for each Operator constructed.
 
-argcc = len(sys.argv)-1
+argcc = len(sys.argv)
 argv = sys.argv
-argv = argv[1:]
 
 encoded = [s.encode('utf-8') for s in argv]
 argv = (ctypes.POINTER(ctypes.c_char) * len(encoded))()
@@ -53,5 +52,5 @@ op_init.apply(argc=argcc, argv=argv)
 op_finalize.apply()
 
 
-print(op_init.ccode)
-print(op_finalize.ccode)
+# print(op_init.ccode)
+# print(op_finalize.ccode)
