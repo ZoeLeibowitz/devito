@@ -6,6 +6,7 @@ from devito.passes.iet.engine import iet_pass
 from devito.ir.iet import (Transformer, MapNodes, Iteration, BlankLine,
                            FindNodes, Call, CallableBody, DummyExpr)
 from devito.symbolics import Byref, Macro, String
+from devito.types.basic import DataSymbol
 from devito.petsc.types import (PetscMPIInt, PetscErrorCode, Initialize, Finalize,
                                 )
 from devito.types import Object
@@ -26,10 +27,22 @@ def lower_petsc(iet, **kwargs):
         return iet, {}
 
     metadata = core_metadata()
+    
+    # initialize or finalize
+    data = FindNodes(PetscMetaData).visit(iet)
 
-    trivial_op = initialize_finalize(iet)
-    if trivial_op:
-        return trivial_op, metadata
+    # init = [i for i in data if isinstance(i.expr.rhs, Initialize)]
+    # finalize = [i for i in data if isinstance(i.expr.rhs, Finalize)]
+
+    # trivial_op = initialize_finalize(iet)
+    # if trivial_op:
+    #     return trivial_op, metadata
+
+    if any(filter(lambda i: isinstance(i.expr.rhs, Initialize), data)):
+        return initialize(data), metadata
+
+    if any(filter(lambda i: isinstance(i.expr.rhs, Finalize), data)):
+        return finalize(data), metadata
 
     targets = [i.expr.rhs.target for (i,) in injectsolve_mapper.values()]
 
@@ -64,36 +77,34 @@ def lower_petsc(iet, **kwargs):
     return iet, metadata
 
 
-def initialize_finalize(iet):
-    data = FindNodes(PetscMetaData).visit(iet)
+def initialize(data):
+    assert len(data) == 1
+    data = data.pop()
 
-    init = [i for i in data if isinstance(i.expr.rhs, Initialize)]
-    finalize = [i for i in data if isinstance(i.expr.rhs, Finalize)]
+    # int because the correct type for argc is a C int
+    # and not a int32
+    argc = DataSymbol(name='argc', dtype=int)
+    argv = ArgvSymbol(name='argv')
+    Help = Macro('help')
 
-    if init:
-        assert len(init) == 1
-        init = init.pop()
-        argc = init.expr.rhs.expr[0]
-        argv = init.expr.rhs.expr[1]
+    tmp = c.Line("static char help[] = \"This is help text.\";")
+    
+    init_body = petsc_call('PetscInitialize', [Byref(argc), Byref(argv), Null, Help])
+    init_body = CallableBody(
+        body=(petsc_func_begin_user, tmp, init_body),
+        retstmt=(Call('PetscFunctionReturn', arguments=[0]),)
+    )
+    return iet._rebuild(body=init_body)
 
-        tmp = c.Line("static char help[] = \"This is help text.\";")
-        
-        init_body = petsc_call('PetscInitialize', [Byref(argc), Byref(argv), Null, Help])
-        init_body = CallableBody(
-            body=(petsc_func_begin_user, tmp, init_body),
-            retstmt=(Call('PetscFunctionReturn', arguments=[0]),)
-        )
-        return iet._rebuild(body=init_body)
-    elif finalize:
-        assert len(finalize) == 1
-        finalize_body = petsc_call('PetscFinalize', [])
-        finalize_body = CallableBody(
-            body=(petsc_func_begin_user, finalize_body),
-            retstmt=(Call('PetscFunctionReturn', arguments=[0]),)
-        )
-        return iet._rebuild(body=finalize_body)
-    else:
-        return None
+
+def finalize(data):
+    assert len(data) == 1
+    finalize_body = petsc_call('PetscFinalize', [])
+    finalize_body = CallableBody(
+        body=(petsc_func_begin_user, finalize_body),
+        retstmt=(Call('PetscFunctionReturn', arguments=[0]),)
+    )
+    return iet._rebuild(body=finalize_body)
 
 
 def make_core_petsc_calls(objs, **kwargs):
@@ -155,10 +166,6 @@ class Builder:
         )
 
 
+# Move these to types folder
 Null = Macro('NULL')
-Help = Macro('help')
 void = 'void'
-
-
-# TODO: Don't use c.Line here?
-petsc_func_begin_user = c.Line('PetscFunctionBeginUser;')

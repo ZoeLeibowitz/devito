@@ -31,7 +31,8 @@ class argv_symbol(DataSymbol):
     def _C_ctype(self):
         return ctypes.POINTER(ctypes.POINTER(c_char))
 
-argc_symb = DataSymbol(name='argc', dtype=np.int32)
+
+argc_symb = DataSymbol(name='argc', dtype=int)
 argv_symb = argv_symbol(name='argv')
 
 
