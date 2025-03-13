@@ -1,4 +1,6 @@
 from devito.petsc import PETScSolve
-# import devito.petsc.initialize
+from devito.petsc.initialize import PetscInitialize
+
+PetscInitialize()
 print("helloworld")
 

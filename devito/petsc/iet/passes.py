@@ -74,11 +74,11 @@ def initialize(iet):
     argv = ArgvSymbol(name='argv')
     Help = Macro('help')
 
-    tmp = c.Line("static char help[] = \"This is help text.\";")
-    
+    help_string = c.Line(r'static char help[] = "This is help text.\n";')
+
     init_body = petsc_call('PetscInitialize', [Byref(argc), Byref(argv), Null, Help])
     init_body = CallableBody(
-        body=(petsc_func_begin_user, tmp, init_body),
+        body=(petsc_func_begin_user, help_string, init_body),
         retstmt=(Call('PetscFunctionReturn', arguments=[0]),)
     )
     return iet._rebuild(body=init_body)
