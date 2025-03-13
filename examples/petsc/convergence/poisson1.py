@@ -49,7 +49,8 @@ def analytical(x, y):
 Lx = np.float64(1.)
 Ly = np.float64(1.)
 
-n_values = [11, 13, 15, 17, 19, 21, 23, 25, 27, 29]
+# n_values = [11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31]
+n_values = [11, 21, 31, 41, 51, 61, 71, 81, 91, 101, 111, 121, 131, 141, 151, 161, 171, 181, 191, 201, 211, 221, 231, 241, 251]
 dx = np.array([Lx/(n-1) for n in n_values])
 errors = []
 
@@ -90,6 +91,7 @@ for n in n_values:
 
     errors.append(error)
 
+print(errors)   
 slope, _ = np.polyfit(np.log(dx), np.log(errors), 1)
 print(slope)
 

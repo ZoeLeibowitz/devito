@@ -1109,10 +1109,16 @@ class BaseSetup:
         snes_get_ksp = petsc_call('SNESGetKSP',
                                   [sobjs['snes'], Byref(sobjs['ksp'])])
 
+        # ksp_set_tols = petsc_call(
+        #     'KSPSetTolerances', [sobjs['ksp'], solver_params['ksp_rtol'],
+        #                          solver_params['ksp_atol'], solver_params['ksp_divtol'],
+        #                          solver_params['ksp_max_it']]
+        # )
+
         ksp_set_tols = petsc_call(
-            'KSPSetTolerances', [sobjs['ksp'], solver_params['ksp_rtol'],
-                                 solver_params['ksp_atol'], solver_params['ksp_divtol'],
-                                 solver_params['ksp_max_it']]
+            'KSPSetTolerances', [sobjs['ksp'], 1e-15, 1e-50,'PETSC_DEFAULT', 'PETSC_DEFAULT']
+                                #  'PETSC_DEFAULT', 'PETSC_DEFAULT',
+                                #  'PETSC_DEFAULT']
         )
 
         ksp_set_type = petsc_call(

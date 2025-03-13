@@ -61,7 +61,10 @@ def analytical(x, y, Lx, Ly):
     return np.float64(np.sinh(tmp*y)) * np.float64(np.sin(tmp*x)) / np.float64(np.sinh(tmp*Ly))
 
 
-n_values = [11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59, 61]
+# n_values = [11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59, 61]
+n_values = [13, 23, 33, 43, 53, 63, 73, 83, 93, 103, 113, 123, 133, 143, 153, 163, 173]
+n_values = [301]
+# n_values = [63]
 dx = np.array([Lx/(n-1) for n in n_values])
 errors = []
 
@@ -84,14 +87,14 @@ for n in n_values:
     # Create boundary condition expressions using subdomains
     bc_func = Function(name='bcs', grid=grid, space_order=2, dtype=np.float64)
     bc_func.data[:] = np.float64(0.0)
-    bc_func.data[:, -1] = np.sin(tmpx*np.pi)
+    bc_func.data[:, -1] = np.float64(np.sin(tmpx*np.pi))
 
-    phi.data[:,-1] = bc_func.data[:,-1]
+    # phi.data[:,-1] = bc_func.data[:,-1]
 
     bcs = [EssentialBC(phi, bc_func, subdomain=sub1)]  # top
-    bcs += [EssentialBC(phi, bc_func, subdomain=sub2)]  # bottom
-    bcs += [EssentialBC(phi, bc_func, subdomain=sub3)]  # left
-    bcs += [EssentialBC(phi, bc_func, subdomain=sub4)]  # right
+    bcs += [EssentialBC(phi, np.float64(0.), subdomain=sub2)]  # bottom
+    bcs += [EssentialBC(phi, np.float64(0.), subdomain=sub3)]  # left
+    bcs += [EssentialBC(phi, np.float64(0.), subdomain=sub4)]  # right
 
     petsc = PETScSolve([eqn]+bcs, target=phi)
 
@@ -106,7 +109,8 @@ for n in n_values:
 
     pd.DataFrame(phi_analytical[:]).to_csv("results/%s_analytical.csv" % n, header=None, index=None)
 
-    error = np.sqrt(np.sum((phi.data[1:-1,1:-1]-phi_analytical[1:-1,1:-1])**2)/np.float64(n*n))
+    # error = np.sqrt(np.sum((phi.data[1:-1,1:-1]-phi_analytical[1:-1,1:-1])**2)/np.float64(n*n))
+    error = np.linalg.norm(phi_analytical[1:-1,1:-1] - phi.data[1:-1, 1:-1]) / np.linalg.norm(phi_analytical[1:-1,1:-1])
 
     errors.append(error)
 
