@@ -25,9 +25,12 @@ grid = Grid(shape=(nx, ny), extent=(2., 2.), dtype=np.float64)
 u = Function(name='u', grid=grid, dtype=np.float64, space_order=2)
 v = Function(name='v', grid=grid, dtype=np.float64, space_order=2)
 
-eq = Eq(v, u.laplace, subdomain=grid.interior)
+v.data[:] = 5.0
 
+eq = Eq(v, u.laplace, subdomain=grid.interior)
 
 petsc = PETScSolve([eq], u)
 
 op = Operator(petsc)
+
+op.apply()

@@ -26,15 +26,7 @@ def lower_petsc(iet, **kwargs):
 
     metadata = core_metadata()
 
-    # initialize or finalize
     data = FindNodes(PetscMetaData).visit(iet)
-
-    # init = [i for i in data if isinstance(i.expr.rhs, Initialize)]
-    # finalize = [i for i in data if isinstance(i.expr.rhs, Finalize)]
-
-    # trivial_op = initialize_finalize(iet)
-    # if trivial_op:
-    #     return trivial_op, metadata
 
     if any(filter(lambda i: isinstance(i.expr.rhs, Initialize), data)):
         return initialize(iet), metadata
@@ -76,9 +68,6 @@ def lower_petsc(iet, **kwargs):
 
 
 def initialize(iet):
-    # assert len(data) == 1
-    # data = data.pop()
-
     # should be int because the correct type for argc is a C int
     # and not a int32
     argc = DataSymbol(name='argc', dtype=np.int32)
@@ -96,7 +85,6 @@ def initialize(iet):
 
 
 def finalize(iet):
-    # assert len(data) == 1
     finalize_body = petsc_call('PetscFinalize', [])
     finalize_body = CallableBody(
         body=(petsc_func_begin_user, finalize_body),
@@ -112,10 +100,7 @@ def make_core_petsc_calls(objs, **kwargs):
 
 
 def build_core_objects(target, **kwargs):
-    if kwargs['options']['mpi']:
-        communicator = target.grid.distributor._obj_comm
-    else:
-        communicator = 'PETSC_COMM_SELF'
+    communicator = 'PETSC_COMM_WORLD'
 
     return {
         'size': PetscMPIInt(name='size'),

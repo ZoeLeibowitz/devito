@@ -189,8 +189,10 @@ class Compiler(GCCToolchain):
 
         self.suffix = kwargs.get('suffix')
         if not kwargs.get('mpi'):
-            self.cc = self.CC if self._cpp is False else self.CXX
-            self.cc = self.cc if self.suffix is None else f'{self.cc}-{self.suffix}'
+            # self.cc = self.CC if self._cpp is False else self.CXX
+            # self.cc = self.cc if self.suffix is None else f'{self.cc}-{self.suffix}'
+            # OBVIOUSLY CAN'T DO THIS HERE
+            self.cc = self.MPICC
         else:
             self.cc = self.MPICC if self._cpp is False else self.MPICXX
         self.ld = self.cc  # Wanted by the superclass
@@ -373,6 +375,7 @@ class Compiler(GCCToolchain):
         # many processes are frequently attempting jit-compilation (e.g.,
         # when running the test suite in parallel)
         with warnings.catch_warnings():
+
             warnings.simplefilter('ignore')
             _, _, _, recompiled = compile_from_string(self, target, code, src_file,
                                                       cache_dir=cache_dir, debug=debug,

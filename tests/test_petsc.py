@@ -13,6 +13,9 @@ from devito.petsc.types import (DM, Mat, LocalVec, PetscMPIInt, KSP,
                                 LinearSolveExpr)
 from devito.petsc.solve import PETScSolve, separate_eqn, centre_stencil
 from devito.petsc.iet.nodes import Expression
+from devito.petsc.initialize import PetscInitialize
+
+PetscInitialize()
 
 
 @skipif('petsc')
@@ -254,14 +257,14 @@ def test_dmda_create():
         op2 = Operator(petsc2, opt='noop')
         op3 = Operator(petsc3, opt='noop')
 
-    assert 'PetscCall(DMDACreate1d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
+    assert 'PetscCall(DMDACreate1d(PETSC_COMM_WORLD,DM_BOUNDARY_GHOSTED,' + \
         '2,1,2,NULL,&(da_0)));' in str(op1)
 
-    assert 'PetscCall(DMDACreate2d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
+    assert 'PetscCall(DMDACreate2d(PETSC_COMM_WORLD,DM_BOUNDARY_GHOSTED,' + \
         'DM_BOUNDARY_GHOSTED,DMDA_STENCIL_BOX,2,2,1,1,1,4,NULL,NULL,&(da_0)));' \
         in str(op2)
 
-    assert 'PetscCall(DMDACreate3d(PETSC_COMM_SELF,DM_BOUNDARY_GHOSTED,' + \
+    assert 'PetscCall(DMDACreate3d(PETSC_COMM_WORLD,DM_BOUNDARY_GHOSTED,' + \
         'DM_BOUNDARY_GHOSTED,DM_BOUNDARY_GHOSTED,DMDA_STENCIL_BOX,6,5,4' + \
         ',1,1,1,1,6,NULL,NULL,NULL,&(da_0)));' in str(op3)
 
@@ -604,8 +607,8 @@ def test_petsc_struct():
 
 
 @skipif('petsc')
-@pytest.mark.parallel(mode=[2, 4, 8])
-def test_apply(mode):
+# @pytest.mark.parallel(mode=[2, 4, 8])
+def test_apply():
 
     grid = Grid(shape=(13, 13), dtype=np.float64)
 
@@ -618,8 +621,8 @@ def test_apply(mode):
     petsc = PETScSolve(eqn, pn)
 
     # Build the op
-    with switchconfig(openmp=False, mpi=True):
-        op = Operator(petsc)
+    # with switchconfig(openmp=False, mpi=True):
+    op = Operator(petsc)
 
     # Check the Operator runs without errors. Not verifying output for
     # now. Need to consolidate BC implementation

@@ -17,17 +17,15 @@ def PetscInitialize():
     if not _petsc_initialized:
         dummy = Symbol(name='d')
 
-        with switchconfig(openmp=False, mpi=True):
+        op_init = Operator(
+            [PetscEq(dummy, Initialize(dummy))],
+            name='kernel_init', opt='noop'
+        )
 
-            op_init = Operator(
-                [PetscEq(dummy, Initialize(dummy))],
-                name='kernel_init', opt='noop'
-            )
-
-            op_finalize = Operator(
-                [PetscEq(dummy, Finalize(dummy))],
-                name='kernel_finalize', opt='noop'
-            )
+        op_finalize = Operator(
+            [PetscEq(dummy, Finalize(dummy))],
+            name='kernel_finalize', opt='noop'
+        )
 
         encoded = [s.encode('utf-8') for s in sys.argv]
         argv = (POINTER(c_char) * len(sys.argv))()
