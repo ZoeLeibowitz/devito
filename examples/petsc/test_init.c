@@ -1,31 +1,22 @@
-
-static char help[] = "";
-
-#include <petscsnes.h>
-#include <petscdm.h>
-#include <petscdmda.h>
-
+#include <petscsys.h>
 
 extern PetscErrorCode PetscInit();
 extern PetscErrorCode PetscFinal();
 
-int main()
+int main(int argc, char **argv)
 {
-  PetscInit();
+  PetscInit(argc, argv);
   PetscPrintf(PETSC_COMM_WORLD, "Hello World!\n");
-  PetscFinalize();
-
-  return 0;
+  return PetscFinalize();
 }
 
-
-PetscErrorCode PetscInit()
+PetscErrorCode PetscInit(int argc, char **argv)
 {
+    static char help[] = "Magic help string\n";
     PetscFunctionBeginUser;
-    PetscCall(PetscInitialize(NULL,NULL,NULL,NULL));
+    PetscCall(PetscInitialize(&argc, &argv, NULL, help));
     PetscFunctionReturn(0);
 }
-
 
 PetscErrorCode PetscFinal()
 {
