@@ -1,6 +1,9 @@
-from devito import Grid, Function, Eq, Operator
+import os
+from devito import Grid, Function, Eq, Operator, configuration
 from devito.petsc import PETScSolve
 import numpy as np
+configuration['compiler'] = 'custom'
+os.environ['CC'] = 'mpicc'
 
 grid = Grid(shape=(11, 11), dtype=np.float64)
 

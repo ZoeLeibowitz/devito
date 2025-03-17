@@ -1,3 +1,4 @@
+import os
 from devito import *
 from devito.petsc import PETScSolve, EssentialBC
 import pandas as pd
@@ -5,6 +6,8 @@ from devito import configuration
 import numpy as np
 import sympy
 configuration['opt'] = 'noop'
+configuration['compiler'] = 'custom'
+os.environ['CC'] = 'mpicc'
 
 
 # Solving phi.laplace = 0
@@ -89,8 +92,8 @@ for n in n_values:
 
     petsc = PETScSolve([eqn]+bcs, target=phi, solver_parameters={'ksp_rtol': 1e-8})
 
-    with switchconfig(openmp=False):
-        op = Operator(petsc)
+    # with switchconfig(openmp=False):
+    op = Operator(petsc)
 
     op.apply()
 

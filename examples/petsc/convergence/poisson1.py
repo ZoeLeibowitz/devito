@@ -5,7 +5,8 @@ from devito import configuration
 import numpy as np
 import sympy
 configuration['opt'] = 'noop'
-
+configuration['compiler'] = 'custom'
+os.environ['CC'] = 'mpicc'
 
 # Solving pn.laplace = 2x(y - 1)(y - 2x + xy + 2)e^(x-y)
 # Constant zero Dirichlet BCs.
@@ -49,8 +50,7 @@ def analytical(x, y):
 Lx = np.float64(1.)
 Ly = np.float64(1.)
 
-# n_values = [11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31]
-n_values = [11, 21, 31, 41, 51, 61, 71, 81, 91, 101, 111, 121, 131, 141, 151, 161, 171, 181, 191, 201, 211, 221, 231, 241, 251]
+n_values = [13, 23, 33, 43, 53, 63, 73, 83, 93, 103, 113, 123, 133, 143, 153, 163, 173]
 dx = np.array([Lx/(n-1) for n in n_values])
 errors = []
 
@@ -64,9 +64,6 @@ for n in n_values:
 
     eqn = Eq(rhs, phi.laplace, subdomain=grid.interior)
 
-    # Initial guess - satisfies BCs
-    phi.data[:] = np.float64(0.)
-
     tmpx = np.linspace(0, Lx, n).astype(np.float64)
     tmpy = np.linspace(0, Ly, n).astype(np.float64)
     Y, X = np.meshgrid(tmpx, tmpy)
@@ -78,16 +75,15 @@ for n in n_values:
     bcs += [EssentialBC(phi, np.float64(0.), subdomain=sub3)]
     bcs += [EssentialBC(phi, np.float64(0.), subdomain=sub4)]
 
-    petsc = PETScSolve([eqn]+bcs, target=phi)
+    petsc = PETScSolve([eqn]+bcs, target=phi, solver_parameters={'ksp_rtol': 1e-8})
 
-    with switchconfig(openmp=False):
-        op = Operator(petsc)
+    op = Operator(petsc)
 
     op.apply()
 
     phi_analytical = analytical(X, Y)
 
-    error = np.amax(np.abs(phi.data[1:-1,1:-1]-phi_analytical[1:-1,1:-1]))
+    error = np.linalg.norm(phi_analytical[1:-1,1:-1] - phi.data[1:-1, 1:-1]) / np.linalg.norm(phi_analytical[1:-1,1:-1])
 
     errors.append(error)
 
