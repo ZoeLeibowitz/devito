@@ -1,6 +1,7 @@
-from functools import singledispatch
+from functools import singledispatch, cached_property
 
 import sympy
+import numpy as np
 
 from devito.finite_differences.differentiable import Mul
 from devito.finite_differences.derivative import Derivative
@@ -29,6 +30,11 @@ class InjectSolve:
         self.time_mapper = None
         self.target_eqns = target_eqns
 
+    # TODO: Add tests for the compatible scaling
+    @cached_property
+    def scaling(self):
+        return np.prod(self.grid.spacing_symbols)
+
     def build_eq(self):
         target, funcs, fielddata = self.linear_solve_args()
         # Placeholder equation for inserting calls to the solver
@@ -44,6 +50,7 @@ class InjectSolve:
     def linear_solve_args(self):
         target, eqns = next(iter(self.target_eqns.items()))
         eqns = as_tuple(eqns)
+        self.grid = target.grid
 
         funcs = get_funcs(eqns)
         self.time_mapper = generate_time_mapper(funcs)
@@ -57,11 +64,18 @@ class InjectSolve:
         )
         matvecs = [self.build_matvec_eqns(eq, target, arrays) for eq in eqns]
 
+        initialguess = [
+            eq for eq in
+            (self.make_initial_guess(e, target, arrays) for e in eqns)
+            if eq is not None
+        ]
+
         return FieldData(
             target=target,
             matvecs=matvecs,
             formfuncs=formfuncs,
             formrhs=formrhs,
+            initialguess=initialguess,
             arrays=arrays
         )
 
@@ -117,6 +131,19 @@ class InjectSolve:
                 subdomain=eq.subdomain
             )
 
+    def make_initial_guess(self, eq, target, arrays):
+        """
+        Enforces initial guess satisfies essential BCs.
+        """
+        if isinstance(eq, EssentialBC):
+            assert eq.lhs == target
+            return Eq(
+                arrays['x'], eq.rhs,
+                subdomain=eq.subdomain
+            )
+        else:
+            return None
+
     def generate_arrays(self, target):
         return {
             p: PETScArray(name=f'{p}_{target.name}',
@@ -134,6 +161,11 @@ class InjectSolveNested(InjectSolve):
         self.time_mapper = generate_time_mapper(funcs)
 
         targets = list(self.target_eqns.keys())
+        unique_grids = {i.grid for i in targets}
+        if len(unique_grids) > 1:
+            raise ValueError("All targets within a single "
+                             "PETScSolve must use the same Grid.")
+        self.grid = unique_grids.pop()
         jacobian = SubMatrices(targets)
 
         all_data = MultipleFieldData(jacobian)
