@@ -102,7 +102,7 @@ class InjectSolve:
         else:
             return Eq(
                 arrays['y'],
-                F_target.subs(targets_to_arrays(arrays['x'], targets))*self.scaling,
+                F_target.subs(targets_to_arrays(arrays['x'], targets)),
                 subdomain=eq.subdomain
             )
 
@@ -115,7 +115,7 @@ class InjectSolve:
         else:
             return Eq(
                 arrays['f'],
-                F_target.subs(targets_to_arrays(arrays['x'], targets))*self.scaling,
+                F_target.subs(targets_to_arrays(arrays['x'], targets)),
                 subdomain=eq.subdomain
             )
 
@@ -127,7 +127,7 @@ class InjectSolve:
             )
         else:
             return Eq(
-                arrays['b'], b*self.scaling,
+                arrays['b'], b,
                 subdomain=eq.subdomain
             )
 

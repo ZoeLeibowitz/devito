@@ -52,19 +52,12 @@ Lx = np.float64(1.)
 Ly = np.float64(1.)
 
 
-# def analytical(x, y, Lx, Ly):
-#     tmp = np.float64(np.pi)/Lx
-#     return (np.float64(np.sinh(tmp*y)) * np.float64(np.sin(tmp*x))) / (np.float64(np.sinh(tmp*Ly)))
-
 def analytical(x, y, Lx, Ly):
     tmp = np.float64(np.pi)/Lx
     return np.float64(np.sinh(tmp*y)) * np.float64(np.sin(tmp*x)) / np.float64(np.sinh(tmp*Ly))
 
 
-# n_values = [11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59, 61]
 n_values = [13, 23, 33, 43, 53, 63, 73, 83, 93, 103, 113, 123, 133, 143, 153, 163, 173]
-n_values = [301]
-# n_values = [63]
 dx = np.array([Lx/(n-1) for n in n_values])
 errors = []
 
@@ -89,38 +82,28 @@ for n in n_values:
     bc_func.data[:] = np.float64(0.0)
     bc_func.data[:, -1] = np.float64(np.sin(tmpx*np.pi))
 
-    # phi.data[:,-1] = bc_func.data[:,-1]
-
     bcs = [EssentialBC(phi, bc_func, subdomain=sub1)]  # top
-    bcs += [EssentialBC(phi, np.float64(0.), subdomain=sub2)]  # bottom
-    bcs += [EssentialBC(phi, np.float64(0.), subdomain=sub3)]  # left
-    bcs += [EssentialBC(phi, np.float64(0.), subdomain=sub4)]  # right
+    bcs += [EssentialBC(phi, bc_func, subdomain=sub2)]  # bottom
+    bcs += [EssentialBC(phi, bc_func, subdomain=sub3)]  # left
+    bcs += [EssentialBC(phi, bc_func, subdomain=sub4)]  # right
 
-    petsc = PETScSolve([eqn]+bcs, target=phi)
+    petsc = PETScSolve([eqn]+bcs, target=phi, solver_parameters={'ksp_rtol': 1e-8})
 
     with switchconfig(openmp=False):
         op = Operator(petsc)
 
     op.apply()
 
-    pd.DataFrame(phi.data[:]).to_csv("results/%s.csv" % n, header=None, index=None)
-
     phi_analytical = analytical(X, Y, Lx, Ly)
 
-    pd.DataFrame(phi_analytical[:]).to_csv("results/%s_analytical.csv" % n, header=None, index=None)
-
-    # error = np.sqrt(np.sum((phi.data[1:-1,1:-1]-phi_analytical[1:-1,1:-1])**2)/np.float64(n*n))
     error = np.linalg.norm(phi_analytical[1:-1,1:-1] - phi.data[1:-1, 1:-1]) / np.linalg.norm(phi_analytical[1:-1,1:-1])
 
     errors.append(error)
 
-# print(op.ccode)
+
 print(errors)
 slope, _ = np.polyfit(np.log(dx), np.log(errors), 1)
 print(slope)
 
-# assert slope > 1.9
-# Seems to be superconverging a bit? (slope is 2.447)
-# assert slope < 2.1
-
-# TODO: investigate why error increases from n=41 to n=43
+assert slope > 1.9
+assert slope < 2.1
