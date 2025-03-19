@@ -28,3 +28,5 @@ class PetscMemoryAllocator(MemoryAllocator):
 
     def free(self, c_pointer):
         self.lib.PetscFree(c_pointer)
+
+PETSC_ALLOC = PetscMemoryAllocator()
