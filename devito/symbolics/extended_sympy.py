@@ -10,7 +10,7 @@ from sympy.core.decorators import call_highest_priority
 from devito.finite_differences.elementary import Min, Max
 from devito.tools import (Pickable, Bunch, as_tuple, is_integer, float2,  # noqa
                           float3, float4, double2, double3, double4, int2, int3,
-                          int4)
+                          int4, CustomIntType)
 from devito.types import Symbol
 from devito.types.basic import Basic
 
@@ -19,8 +19,8 @@ __all__ = ['CondEq', 'CondNe', 'IntDiv', 'CallFromPointer',  # noqa
            'ListInitializer', 'Byref', 'IndexedPointer', 'Cast', 'DefFunction',
            'MathFunction', 'InlineIf', 'ReservedWord', 'Keyword', 'String',
            'Macro', 'Class', 'MacroArgument', 'CustomType', 'Deref', 'Namespace',
-           'Rvalue', 'INT', 'FLOAT', 'DOUBLE', 'VOID', 'Null', 'SizeOf', 'rfunc',
-           'cast_mapper', 'BasicWrapperMixin', 'ValueLimit', 'limits_mapper']
+           'Rvalue', 'INT', 'FLOAT', 'DOUBLE', 'VOID', 'VOIDP', 'Null', 'SizeOf', 'rfunc',
+           'cast_mapper', 'BasicWrapperMixin', 'ValueLimit', 'limits_mapper', 'Mod']
 
 
 class CondEq(sympy.Eq):
@@ -90,9 +90,16 @@ class IntDiv(sympy.Expr):
             # Perhaps it's a symbolic RHS -- but we wanna be sure it's of type int
             if not hasattr(rhs, 'dtype'):
                 raise ValueError("Symbolic RHS `%s` lacks dtype" % rhs)
-            if not issubclass(rhs.dtype, np.integer):
-                raise ValueError("Symbolic RHS `%s` must be of type `int`, found "
-                                 "`%s` instead" % (rhs, rhs.dtype))
+
+            # TODO: Move into a utility function?
+            is_int_type = isinstance(rhs.dtype, type) and \
+                issubclass(rhs.dtype, np.integer)
+            is_custom_int_type = isinstance(rhs.dtype, CustomIntType)
+            assert is_int_type or is_custom_int_type, (
+                f"Symbolic RHS `{rhs}` must be of type `int`, "
+                f"found `{rhs.dtype}` instead"
+            )
+
         rhs = sympify(rhs)
 
         obj = sympy.Expr.__new__(cls, lhs, rhs)
@@ -113,6 +120,26 @@ class IntDiv(sympy.Expr):
             # a*(i/a) => i
             return self.lhs
         return super().__mul__(other)
+
+
+class Mod(sympy.Expr):
+    # TODO: Add tests
+    is_Atom = True
+    is_commutative = True
+
+    def __new__(cls, lhs, rhs, params=None):
+        rhs = sympify(rhs)
+
+        obj = sympy.Expr.__new__(cls, lhs, rhs)
+
+        obj.lhs = lhs
+        obj.rhs = rhs
+        return obj
+
+    def __str__(self):
+        return "Mod(%s, %s)" % (self.lhs, self.rhs)
+
+    __repr__ = __str__
 
 
 class BasicWrapperMixin:
@@ -167,7 +194,7 @@ class CallFromPointer(sympy.Expr, Pickable, BasicWrapperMixin):
             pointer = Symbol(pointer)
         if isinstance(call, str):
             call = Symbol(call)
-        elif not isinstance(call, Basic):
+        elif not isinstance(call.base, Basic):
             raise ValueError("`call` must be a `devito.Basic` or a type "
                              "with compatible interface")
         _params = []
@@ -821,6 +848,10 @@ class ULONG(Cast):
 
 class VOID(Cast):
     _base_typ = 'void'
+
+
+class VOIDP(CastStar):
+    base = VOID
 
 
 class CHARP(CastStar):
