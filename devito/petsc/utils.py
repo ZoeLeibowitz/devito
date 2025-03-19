@@ -2,6 +2,9 @@ import os
 
 from devito.tools import memoized_func
 
+class PetscOSError(OSError):
+    pass
+
 
 solver_mapper = {
     'gmres': 'KSPGMRES',
@@ -12,42 +15,32 @@ solver_mapper = {
 
 @memoized_func
 def get_petsc_dir():
-    # *** First try: via commonly used environment variables
-    for i in ['PETSC_DIR']:
-        petsc_dir = os.environ.get(i)
-        if petsc_dir:
-            return petsc_dir
-    # TODO: Raise error if PETSC_DIR is not set
-    return None
+    petsc_dir = os.environ.get('PETSC_DIR')
+    if petsc_dir is None:
+        raise PetscOSError("PETSC_DIR environment variable not set")
+    return petsc_dir
 
 
 @memoized_func
 def get_petsc_arch():
-    # *** First try: via commonly used environment variables
-    for i in ['PETSC_ARCH']:
-        petsc_arch = os.environ.get(i)
-        if petsc_arch:
-            return petsc_arch
-    # TODO: Raise error if PETSC_ARCH is not set
-    return None
+    # Note: users don't have to set PETSC_ARCH
+    return os.environ.get('PETSC_ARCH')
 
 
 def core_metadata():
     petsc_dir = get_petsc_dir()
     petsc_arch = get_petsc_arch()
 
-    # Include directories
-    global_include = os.path.join(petsc_dir, 'include')
-    config_specific_include = os.path.join(petsc_dir, f'{petsc_arch}', 'include')
-    include_dirs = (global_include, config_specific_include)
-
-    # Lib directories
-    lib_dir = os.path.join(petsc_dir, f'{petsc_arch}', 'lib')
+    petsc_include = (os.path.join(petsc_dir, 'include'),)
+    petsc_lib = (os.path.join(petsc_dir, 'lib'),)
+    if petsc_arch:
+        petsc_include += (os.path.join(petsc_dir, petsc_arch, 'include'),)
+        petsc_lib += (os.path.join(petsc_dir, petsc_arch, 'lib'),)
 
     return {
         'includes': ('petscsnes.h', 'petscdmda.h'),
-        'include_dirs': include_dirs,
+        'include_dirs': petsc_include,
         'libs': ('petsc'),
-        'lib_dirs': lib_dir,
-        'ldflags': ('-Wl,-rpath,%s' % lib_dir)
+        'lib_dirs': petsc_lib,
+        'ldflags': tuple([f"-Wl,-rpath, {lib}" for lib in petsc_lib])
     }
