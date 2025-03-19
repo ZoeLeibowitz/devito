@@ -27,6 +27,7 @@ def get_petsc_arch():
     return os.environ.get('PETSC_ARCH')
 
 
+@memoized_func
 def core_metadata():
     petsc_dir = get_petsc_dir()
     petsc_arch = get_petsc_arch()
