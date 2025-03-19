@@ -43,5 +43,5 @@ def core_metadata():
         'include_dirs': petsc_include,
         'libs': ('petsc'),
         'lib_dirs': petsc_lib,
-        'ldflags': tuple([f"-Wl,-rpath, {lib}" for lib in petsc_lib])
+        'ldflags': tuple([f"-Wl,-rpath,{lib}" for lib in petsc_lib])
     }
