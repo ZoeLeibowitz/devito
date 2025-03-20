@@ -13,7 +13,7 @@ import numpy as np
 from devito.logger import logger
 from devito.parameters import configuration
 from devito.tools import dtype_to_ctype, is_integer
-from devito.petsc.utils import core_metadata
+
 
 __all__ = ['ALLOC_ALIGNED', 'ALLOC_NUMA_LOCAL', 'ALLOC_NUMA_ANY',
            'ALLOC_KNL_MCDRAM', 'ALLOC_KNL_DRAM', 'ALLOC_GUARD',
@@ -344,6 +344,8 @@ class PetscMemoryAllocator(MemoryAllocator):
     """
     @classmethod
     def initialize(cls):
+        # from IPython import embed; embed()
+        from devito.petsc.utils import core_metadata
         metadata = core_metadata()
         lib_dir = Path(metadata['lib_dirs'][-1])
 
