@@ -4,7 +4,7 @@ import pytest
 
 from conftest import skipif
 from devito import (Grid, Function, TimeFunction, Eq, Operator, switchconfig,
-                    configuration, norm, SubDomain)
+                    configuration, norm)
 from devito.ir.iet import (Call, ElementalFunction, Definition, DummyExpr,
                            FindNodes, retrieve_iteration_tree)
 from devito.types import Constant, LocalCompositeObject
@@ -12,7 +12,7 @@ from devito.passes.iet.languages.C import CDataManager
 from devito.petsc.types import (DM, Mat, LocalVec, PetscMPIInt, KSP,
                                 PC, KSPConvergedReason, PETScArray,
                                 LinearSolveExpr, FieldData, MultipleFieldData)
-from devito.petsc.solve import PETScSolve, separate_eqn, centre_stencil, EssentialBC
+from devito.petsc.solve import PETScSolve, separate_eqn, centre_stencil
 from devito.petsc.iet.nodes import Expression
 from devito.petsc.initialize import PetscInitialize
 
