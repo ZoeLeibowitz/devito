@@ -874,7 +874,8 @@ class BaseObjectBuilder:
         base_dict = {
             'Jac': Mat(sreg.make_name(prefix='J')),
             'xglobal': Vec(sreg.make_name(prefix='xglobal')),
-            'xlocal': Vec(sreg.make_name(prefix='xlocal')),
+            # TODO: I think 'xloc' should technically be a Vec because it should be destroyed?
+            'xlocal': CallbackVec(sreg.make_name(prefix='xlocal')),
             'bglobal': Vec(sreg.make_name(prefix='bglobal')),
             'blocal': CallbackVec(sreg.make_name(prefix='blocal')),
             'ksp': KSP(sreg.make_name(prefix='ksp')),

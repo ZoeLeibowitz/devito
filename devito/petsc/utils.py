@@ -23,7 +23,8 @@ def get_petsc_dir():
 
 @memoized_func
 def get_petsc_arch():
-    # Note: users don't have to set PETSC_ARCH
+    # Note: users don't have to explicitly set PETSC_ARCH
+    # if they add it to the PETSC_DIR path
     return os.environ.get('PETSC_ARCH')
 
 
