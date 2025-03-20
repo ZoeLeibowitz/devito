@@ -2,6 +2,7 @@ import os
 
 from devito.tools import memoized_func
 
+
 class PetscOSError(OSError):
     pass
 

@@ -6,12 +6,14 @@ from ctypes.util import find_library
 import mmap
 import os
 import sys
+from pathlib import Path
 
 import numpy as np
 
 from devito.logger import logger
 from devito.parameters import configuration
 from devito.tools import dtype_to_ctype, is_integer
+from devito.petsc.utils import core_metadata
 
 __all__ = ['ALLOC_ALIGNED', 'ALLOC_NUMA_LOCAL', 'ALLOC_NUMA_ANY',
            'ALLOC_KNL_MCDRAM', 'ALLOC_KNL_DRAM', 'ALLOC_GUARD',
@@ -351,7 +353,6 @@ class PetscMemoryAllocator(MemoryAllocator):
             cls.lib = None
 
     def _alloc_C_libcall(self, size, ctype):
-        c_bytesize = ctypes.c_ulong(size * ctypes.sizeof(ctype))
         c_pointer = ctypes.cast(ctypes.c_void_p(), ctypes.c_void_p)
         ret = self.lib.PetscMalloc(size, ctypes.byref(c_pointer))
 

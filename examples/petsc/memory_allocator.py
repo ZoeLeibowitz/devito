@@ -1,11 +1,10 @@
 import os
 import numpy as np
 
-from devito import (Grid, Function, Eq, Operator, configuration, TimeFunction, switchconfig)
+from devito import Grid, Function, Eq, Operator, configuration
 from devito.petsc import PETScSolve
 from devito.petsc.initialize import PetscInitialize
 from devito.data.allocators import ALLOC_PETSC
-import devito.data.allocators
 configuration['compiler'] = 'custom'
 os.environ['CC'] = 'mpicc'
 
