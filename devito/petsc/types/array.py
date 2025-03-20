@@ -1,12 +1,11 @@
 from functools import cached_property
-from ctypes import POINTER
 
 from devito.types.utils import DimensionTuple
 from devito.types.array import ArrayBasic
 from devito.finite_differences import Differentiable
 from devito.types.basic import AbstractFunction
 from devito.finite_differences.tools import fd_weights_registry
-from devito.tools import dtype_to_ctype, as_tuple, CustomDtype
+from devito.tools import as_tuple, CustomDtype
 from devito.symbolics import FieldFromComposite
 
 
@@ -106,10 +105,7 @@ class PETScArray(ArrayBasic, Differentiable):
 
     @cached_property
     def _C_ctype(self):
-        # TODO: Use cat $PETSC_DIR/$PETSC_ARCH/lib/petsc/conf/petscvariables
-        # | grep -E "PETSC_(SCALAR|PRECISION)" to determine the precision of
-        # the user's PETSc configuration.
-        return CustomDtype('PetscScalar', modifier= ' *')
+        return CustomDtype('PetscScalar', modifier=' *')
 
     @property
     def symbolic_shape(self):

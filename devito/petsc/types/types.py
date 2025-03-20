@@ -5,7 +5,6 @@ from devito.tools.dtypes_lowering import mapper
 from devito.petsc.utils import get_petsc_precision
 
 
-
 class MetaData(sympy.Function, Reconstructable):
     def __new__(cls, expr, **kwargs):
         with sympy_mutex:

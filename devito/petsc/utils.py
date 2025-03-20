@@ -73,6 +73,7 @@ def get_petsc_variables():
     return {k.strip(): v.strip() for k, v in splitlines}
 
 
+@memoized_func
 def get_petsc_precision():
     """
     Get the PETSc precision.
