@@ -222,6 +222,10 @@ class CodeSymbol:
         """
         return False
 
+    @property
+    def _restrict_keyword(self):
+        return 'restrict'
+
 
 class Basic(CodeSymbol):
 

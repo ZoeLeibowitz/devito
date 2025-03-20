@@ -186,7 +186,6 @@ class CGen(Visitor):
         '_mem_constant': 'static',
         '_mem_shared': '',
     }
-    _restrict_keyword = 'restrict'
 
     def _gen_struct_decl(self, obj, masked=()):
         """
@@ -259,7 +258,7 @@ class CGen(Visitor):
             strshape = ''
             if isinstance(obj, (AbstractFunction, IndexedData)) and mode >= 1:
                 if not obj._mem_stack:
-                    strtype = '%s%s' % (strtype, self._restrict_keyword)
+                    strtype = '%s%s' % (strtype, obj._restrict_keyword)
         strtype = ' '.join(qualifiers + [strtype])
 
         if obj.is_LocalType and obj._C_modifier is not None and mode == 2:
