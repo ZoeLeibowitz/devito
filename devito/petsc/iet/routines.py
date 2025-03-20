@@ -874,7 +874,7 @@ class BaseObjectBuilder:
         base_dict = {
             'Jac': Mat(sreg.make_name(prefix='J')),
             'xglobal': Vec(sreg.make_name(prefix='xglobal')),
-            'xlocal': CallbackVec(sreg.make_name(prefix='xlocal')),
+            'xlocal': Vec(sreg.make_name(prefix='xlocal')),
             'bglobal': Vec(sreg.make_name(prefix='bglobal')),
             'blocal': CallbackVec(sreg.make_name(prefix='blocal')),
             'ksp': KSP(sreg.make_name(prefix='ksp')),

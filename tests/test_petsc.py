@@ -726,16 +726,16 @@ def test_time_loop():
     - Only assign/update the modulo dimensions required by any of the
     PETSc callback functions.
     """
-    grid = Grid((11, 11))
+    grid = Grid((11, 11), dtype=np.float64)
 
     # Modulo time stepping
-    u1 = TimeFunction(name='u1', grid=grid, space_order=2)
-    v1 = Function(name='v1', grid=grid, space_order=2)
+    u1 = TimeFunction(name='u1', grid=grid, space_order=2, dtype=np.float64)
+    v1 = Function(name='v1', grid=grid, space_order=2, dtype=np.float64)
     eq1 = Eq(v1.laplace, u1)
     petsc1 = PETScSolve(eq1, v1)
     with switchconfig(openmp=False):
         op1 = Operator(petsc1)
-    op1.apply(time_M=5)
+    op1.apply(time_M=3)
     body1 = str(op1.body)
     rhs1 = str(op1._func_table['FormRHS0'].root.ccode)
 
@@ -745,13 +745,13 @@ def test_time_loop():
     assert 'ctx0->t1' not in rhs1
 
     # Non-modulo time stepping
-    u2 = TimeFunction(name='u2', grid=grid, space_order=2, save=5)
-    v2 = Function(name='v2', grid=grid, space_order=2, save=5)
+    u2 = TimeFunction(name='u2', grid=grid, space_order=2, save=5, dtype=np.float64)
+    v2 = Function(name='v2', grid=grid, space_order=2, save=5, dtype=np.float64)
     eq2 = Eq(v2.laplace, u2)
     petsc2 = PETScSolve(eq2, v2)
     with switchconfig(openmp=False):
         op2 = Operator(petsc2)
-    # op2.apply(time_M=5)
+    op2.apply(time_M=3)
     body2 = str(op2.body)
     rhs2 = str(op2._func_table['FormRHS0'].root.ccode)
 
@@ -764,7 +764,7 @@ def test_time_loop():
     petsc3 = PETScSolve(eq3, v1)
     with switchconfig(openmp=False):
         op3 = Operator(petsc3)
-    # op3.apply(time_M=5)
+    op3.apply(time_M=3)
     body3 = str(op3.body)
     rhs3 = str(op3._func_table['FormRHS0'].root.ccode)
 
@@ -774,14 +774,14 @@ def test_time_loop():
     assert 'ctx0->t1' in rhs3
 
     # Multiple petsc solves within the same time loop
-    v2 = Function(name='v2', grid=grid, space_order=2)
+    v2 = Function(name='v2', grid=grid, space_order=2, dtype=np.float64)
     eq4 = Eq(v1.laplace, u1)
     petsc4 = PETScSolve(eq4, v1)
     eq5 = Eq(v2.laplace, u1)
     petsc5 = PETScSolve(eq5, v2)
     with switchconfig(openmp=False):
         op4 = Operator(petsc4 + petsc5)
-    # op4.apply(time_M=5)
+    op4.apply(time_M=3)
     body4 = str(op4.body)
 
     assert 'ctx0.t0 = t0' in body4
