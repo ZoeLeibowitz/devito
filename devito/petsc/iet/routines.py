@@ -16,7 +16,7 @@ from devito.petsc.iet.nodes import (PETScCallable, FormFunctionCallback,
                                     MatShellSetOp, PetscMetaData)
 from devito.petsc.iet.utils import petsc_call, petsc_struct
 from devito.petsc.utils import solver_mapper
-from devito.petsc.types import (DM, Mat, LocalVec, GlobalVec, KSP, PC, SNES,
+from devito.petsc.types import (DM, Mat, CallbackVec, Vec, KSP, PC, SNES,
                                 PetscInt, StartPtr, PointerIS, PointerDM, VecScatter,
                                 DMCast, JacobianStructCast, JacobianStruct,
                                 SubMatrixStruct, CallbackDM)
@@ -448,8 +448,13 @@ class CBBuilder:
             'VecRestoreArray', [sobjs['blocal'], Byref(b_arr._C_symbol)]
         )
 
+        dm_restore_local_bvec = petsc_call(
+            'DMRestoreLocalVector', [dmda, Byref(sobjs['blocal'])]
+        )
+
         body = body._rebuild(body=body.body + (
-            dm_local_to_global_begin, dm_local_to_global_end, vec_restore_array
+            dm_local_to_global_begin, dm_local_to_global_end, vec_restore_array,
+            dm_restore_local_bvec
         ))
 
         stacks = (
@@ -868,10 +873,12 @@ class BaseObjectBuilder:
         targets = self.fielddata.targets
         base_dict = {
             'Jac': Mat(sreg.make_name(prefix='J')),
-            'xglobal': GlobalVec(sreg.make_name(prefix='xglobal')),
-            'xlocal': LocalVec(sreg.make_name(prefix='xlocal')),
-            'bglobal': GlobalVec(sreg.make_name(prefix='bglobal')),
-            'blocal': LocalVec(sreg.make_name(prefix='blocal')),
+            'xglobal': Vec(sreg.make_name(prefix='xglobal')),
+            # TODO: I think 'xloc' should technically be a Vec because
+            # it should be destroyed?
+            'xlocal': CallbackVec(sreg.make_name(prefix='xlocal')),
+            'bglobal': Vec(sreg.make_name(prefix='bglobal')),
+            'blocal': CallbackVec(sreg.make_name(prefix='blocal')),
             'ksp': KSP(sreg.make_name(prefix='ksp')),
             'pc': PC(sreg.make_name(prefix='pc')),
             'snes': SNES(sreg.make_name(prefix='snes')),
@@ -937,9 +944,9 @@ class CoupledObjectBuilder(BaseObjectBuilder):
                 name=f'{key}ctx',
                 fields=objs['subctx'].fields,
             )
-            base_dict[f'{key}X'] = LocalVec(f'{key}X')
-            base_dict[f'{key}Y'] = LocalVec(f'{key}Y')
-            base_dict[f'{key}F'] = LocalVec(f'{key}F')
+            base_dict[f'{key}X'] = CallbackVec(f'{key}X')
+            base_dict[f'{key}Y'] = CallbackVec(f'{key}Y')
+            base_dict[f'{key}F'] = CallbackVec(f'{key}F')
 
         return base_dict
 
@@ -951,22 +958,22 @@ class CoupledObjectBuilder(BaseObjectBuilder):
             base_dict[f'{name}_ptr'] = StartPtr(
                 sreg.make_name(prefix=f'{name}_ptr'), t.dtype
             )
-            base_dict[f'xlocal{name}'] = LocalVec(
+            base_dict[f'xlocal{name}'] = CallbackVec(
                 sreg.make_name(prefix=f'xlocal{name}'), liveness='eager'
             )
-            base_dict[f'Fglobal{name}'] = LocalVec(
+            base_dict[f'Fglobal{name}'] = CallbackVec(
                 sreg.make_name(prefix=f'Fglobal{name}'), liveness='eager'
             )
-            base_dict[f'Xglobal{name}'] = LocalVec(
+            base_dict[f'Xglobal{name}'] = CallbackVec(
                 sreg.make_name(prefix=f'Xglobal{name}')
             )
-            base_dict[f'xglobal{name}'] = GlobalVec(
+            base_dict[f'xglobal{name}'] = Vec(
                 sreg.make_name(prefix=f'xglobal{name}')
             )
-            base_dict[f'blocal{name}'] = LocalVec(
+            base_dict[f'blocal{name}'] = CallbackVec(
                 sreg.make_name(prefix=f'blocal{name}'), liveness='eager'
             )
-            base_dict[f'bglobal{name}'] = GlobalVec(
+            base_dict[f'bglobal{name}'] = Vec(
                 sreg.make_name(prefix=f'bglobal{name}')
             )
             base_dict[f'da{name}'] = DM(
