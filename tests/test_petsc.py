@@ -4,7 +4,7 @@ import pytest
 
 from conftest import skipif
 from devito import (Grid, Function, TimeFunction, Eq, Operator, switchconfig,
-                    configuration, norm)
+                    configuration, norm, SubDomain)
 from devito.ir.iet import (Call, ElementalFunction, Definition, DummyExpr,
                            FindNodes, retrieve_iteration_tree)
 from devito.types import Constant, LocalCompositeObject
@@ -12,7 +12,7 @@ from devito.passes.iet.languages.C import CDataManager
 from devito.petsc.types import (DM, Mat, LocalVec, PetscMPIInt, KSP,
                                 PC, KSPConvergedReason, PETScArray,
                                 LinearSolveExpr, FieldData, MultipleFieldData)
-from devito.petsc.solve import PETScSolve, separate_eqn, centre_stencil
+from devito.petsc.solve import PETScSolve, separate_eqn, centre_stencil, EssentialBC
 from devito.petsc.iet.nodes import Expression
 from devito.petsc.initialize import PetscInitialize
 
@@ -75,9 +75,9 @@ def test_petsc_functions():
 
     expr = DummyExpr(ptr0.indexed[x, y], ptr1.indexed[x, y] + 1)
 
-    assert str(defn0) == 'float *restrict ptr0_vec;'
-    assert str(defn1) == 'const float *restrict ptr1_vec;'
-    assert str(defn2) == 'const double *restrict ptr2_vec;'
+    assert str(defn0) == 'PetscScalar * ptr0_vec;'
+    assert str(defn1) == 'const PetscScalar * ptr1_vec;'
+    assert str(defn2) == 'const PetscScalar * ptr2_vec;'
     assert str(expr) == 'ptr0[x][y] = ptr1[x][y] + 1;'
 
 
@@ -112,10 +112,10 @@ def test_petsc_solve():
     """
     Test PETScSolve.
     """
-    grid = Grid((2, 2))
+    grid = Grid((2, 2), dtype=np.float64)
 
-    f = Function(name='f', grid=grid, space_order=2)
-    g = Function(name='g', grid=grid, space_order=2)
+    f = Function(name='f', grid=grid, space_order=2, dtype=np.float64)
+    g = Function(name='g', grid=grid, space_order=2, dtype=np.float64)
 
     eqn = Eq(f.laplace, g)
 
@@ -161,13 +161,13 @@ def test_multiple_petsc_solves():
     """
     Test multiple PETScSolves.
     """
-    grid = Grid((2, 2))
+    grid = Grid((2, 2), dtype=np.float64)
 
-    f1 = Function(name='f1', grid=grid, space_order=2)
-    g1 = Function(name='g1', grid=grid, space_order=2)
+    f1 = Function(name='f1', grid=grid, space_order=2, dtype=np.float64)
+    g1 = Function(name='g1', grid=grid, space_order=2, dtype=np.float64)
 
-    f2 = Function(name='f2', grid=grid, space_order=2)
-    g2 = Function(name='g2', grid=grid, space_order=2)
+    f2 = Function(name='f2', grid=grid, space_order=2, dtype=np.float64)
+    g2 = Function(name='g2', grid=grid, space_order=2, dtype=np.float64)
 
     eqn1 = Eq(f1.laplace, g1)
     eqn2 = Eq(f2.laplace, g2)
@@ -189,13 +189,13 @@ def test_petsc_cast():
     """
     Test casting of PETScArray.
     """
-    grid1 = Grid((2))
-    grid2 = Grid((2, 2))
-    grid3 = Grid((4, 5, 6))
+    grid1 = Grid((2), dtype=np.float64)
+    grid2 = Grid((2, 2), dtype=np.float64)
+    grid3 = Grid((4, 5, 6), dtype=np.float64)
 
-    f1 = Function(name='f1', grid=grid1, space_order=2)
-    f2 = Function(name='f2', grid=grid2, space_order=4)
-    f3 = Function(name='f3', grid=grid3, space_order=6)
+    f1 = Function(name='f1', grid=grid1, space_order=2, dtype=np.float64)
+    f2 = Function(name='f2', grid=grid2, space_order=4, dtype=np.float64)
+    f3 = Function(name='f3', grid=grid3, space_order=6, dtype=np.float64)
 
     eqn1 = Eq(f1.laplace, 10)
     eqn2 = Eq(f2.laplace, 10)
@@ -214,28 +214,25 @@ def test_petsc_cast():
     cb2 = [meta_call.root for meta_call in op2._func_table.values()]
     cb3 = [meta_call.root for meta_call in op3._func_table.values()]
 
-    assert 'float (*restrict x_f1) = ' + \
-        '(float (*)) x_f1_vec;' in str(cb1[0])
-    assert 'float (*restrict x_f2)[info.gxm] = ' + \
-        '(float (*)[info.gxm]) x_f2_vec;' in str(cb2[0])
-    assert 'float (*restrict x_f3)[info.gym][info.gxm] = ' + \
-        '(float (*)[info.gym][info.gxm]) x_f3_vec;' in str(cb3[0])
+    assert 'double (*restrict x_f1) = ' + \
+        '(double (*)) x_f1_vec;' in str(cb1[0])
+    assert 'double (*restrict x_f2)[info.gxm] = ' + \
+        '(double (*)[info.gxm]) x_f2_vec;' in str(cb2[0])
+    assert 'double (*restrict x_f3)[info.gym][info.gxm] = ' + \
+        '(double (*)[info.gym][info.gxm]) x_f3_vec;' in str(cb3[0])
 
 
 @skipif('petsc')
 def test_LinearSolveExpr():
 
-    grid = Grid((2, 2))
+    grid = Grid((2, 2), dtype=np.float64)
 
-    f = Function(name='f', grid=grid, space_order=2)
-    g = Function(name='g', grid=grid, space_order=2)
+    f = Function(name='f', grid=grid, space_order=2, dtype=np.float64)
+    g = Function(name='g', grid=grid, space_order=2, dtype=np.float64)
 
     eqn = Eq(f, g.laplace)
 
-    linsolveexpr = LinearSolveExpr(eqn.rhs, target=f)
-
-    # TODO: maybe expand this test now to check the fielddata etc
-    linsolveexpr = LinearSolveExpr(eqn.rhs)
+    linsolveexpr = LinearSolveExpr(eqn.rhs, fielddata=FieldData(target=f))
 
     # Check the solver parameters
     assert linsolveexpr.solver_parameters == \
@@ -246,13 +243,13 @@ def test_LinearSolveExpr():
 @skipif('petsc')
 def test_dmda_create():
 
-    grid1 = Grid((2))
-    grid2 = Grid((2, 2))
-    grid3 = Grid((4, 5, 6))
+    grid1 = Grid((2), dtype=np.float64)
+    grid2 = Grid((2, 2), dtype=np.float64)
+    grid3 = Grid((4, 5, 6), dtype=np.float64)
 
-    f1 = Function(name='f1', grid=grid1, space_order=2)
-    f2 = Function(name='f2', grid=grid2, space_order=4)
-    f3 = Function(name='f3', grid=grid3, space_order=6)
+    f1 = Function(name='f1', grid=grid1, space_order=2, dtype=np.float64)
+    f2 = Function(name='f2', grid=grid2, space_order=4, dtype=np.float64)
+    f3 = Function(name='f3', grid=grid3, space_order=6, dtype=np.float64)
 
     eqn1 = Eq(f1.laplace, 10)
     eqn2 = Eq(f2.laplace, 10)
@@ -282,8 +279,8 @@ def test_dmda_create():
 @skipif('petsc')
 def test_cinterface_petsc_struct():
 
-    grid = Grid(shape=(11, 11))
-    f = Function(name='f', grid=grid, space_order=2)
+    grid = Grid(shape=(11, 11), dtype=np.float64)
+    f = Function(name='f', grid=grid, space_order=2, dtype=np.float64)
     eq = Eq(f.laplace, 10)
     petsc = PETScSolve(eq, f)
 
@@ -561,10 +558,10 @@ def test_callback_arguments():
     """
     Test the arguments of each callback function.
     """
-    grid = Grid((2, 2))
+    grid = Grid((2, 2), dtype=np.float64)
 
-    f1 = Function(name='f1', grid=grid, space_order=2)
-    g1 = Function(name='g1', grid=grid, space_order=2)
+    f1 = Function(name='f1', grid=grid, space_order=2, dtype=np.float64)
+    g1 = Function(name='g1', grid=grid, space_order=2, dtype=np.float64)
 
     eqn1 = Eq(f1.laplace, g1)
 
@@ -586,10 +583,10 @@ def test_callback_arguments():
 @skipif('petsc')
 def test_petsc_struct():
 
-    grid = Grid((2, 2))
+    grid = Grid((2, 2), dtype=np.float64)
 
-    f1 = Function(name='f1', grid=grid, space_order=2)
-    g1 = Function(name='g1', grid=grid, space_order=2)
+    f1 = Function(name='f1', grid=grid, space_order=2, dtype=np.float64)
+    g1 = Function(name='g1', grid=grid, space_order=2, dtype=np.float64)
 
     mu1 = Constant(name='mu1', value=2.0)
     mu2 = Constant(name='mu2', value=2.0)
@@ -643,10 +640,10 @@ def test_apply():
 @skipif('petsc')
 def test_petsc_frees():
 
-    grid = Grid((2, 2))
+    grid = Grid((2, 2), dtype=np.float64)
 
-    f = Function(name='f', grid=grid, space_order=2)
-    g = Function(name='g', grid=grid, space_order=2)
+    f = Function(name='f', grid=grid, space_order=2, dtype=np.float64)
+    g = Function(name='g', grid=grid, space_order=2, dtype=np.float64)
 
     eqn = Eq(f.laplace, g)
     petsc = PETScSolve(eqn, f)
@@ -667,10 +664,10 @@ def test_petsc_frees():
 @skipif('petsc')
 def test_calls_to_callbacks():
 
-    grid = Grid((2, 2))
+    grid = Grid((2, 2), dtype=np.float64)
 
-    f = Function(name='f', grid=grid, space_order=2)
-    g = Function(name='g', grid=grid, space_order=2)
+    f = Function(name='f', grid=grid, space_order=2, dtype=np.float64)
+    g = Function(name='g', grid=grid, space_order=2, dtype=np.float64)
 
     eqn = Eq(f.laplace, g)
     petsc = PETScSolve(eqn, f)
@@ -695,7 +692,7 @@ def test_start_ptr():
     that the correct memory location is accessed and modified during each time step.
     """
     grid = Grid((11, 11))
-    u1 = TimeFunction(name='u1', grid=grid, space_order=2, dtype=np.float32)
+    u1 = TimeFunction(name='u1', grid=grid, space_order=2, dtype=np.float64)
     eq1 = Eq(u1.dt, u1.laplace, subdomain=grid.interior)
     petsc1 = PETScSolve(eq1, u1.forward)
 
@@ -703,18 +700,18 @@ def test_start_ptr():
         op1 = Operator(petsc1)
 
     # Verify the case with modulo time stepping
-    assert 'float * u1_ptr0 = t1*localsize0 + (float*)(u1_vec->data);' in str(op1)
+    assert 'double * u1_ptr0 = t1*localsize0 + (double*)(u1_vec->data);' in str(op1)
 
     # Verify the case with no modulo time stepping
-    u2 = TimeFunction(name='u2', grid=grid, space_order=2, dtype=np.float32, save=5)
+    u2 = TimeFunction(name='u2', grid=grid, space_order=2, dtype=np.float64, save=5)
     eq2 = Eq(u2.dt, u2.laplace, subdomain=grid.interior)
     petsc2 = PETScSolve(eq2, u2.forward)
 
     with switchconfig(openmp=False):
         op2 = Operator(petsc2)
 
-    assert 'float * u2_ptr0 = (time + 1)*localsize0 + ' + \
-        '(float*)(u2_vec->data);' in str(op2)
+    assert 'double * u2_ptr0 = (time + 1)*localsize0 + ' + \
+        '(double*)(u2_vec->data);' in str(op2)
 
 
 @skipif('petsc')
@@ -726,11 +723,11 @@ def test_time_loop():
     - Only assign/update the modulo dimensions required by any of the
     PETSc callback functions.
     """
-    grid = Grid((11, 11))
+    grid = Grid((11, 11), dtype=np.float64)
 
     # Modulo time stepping
-    u1 = TimeFunction(name='u1', grid=grid, space_order=2)
-    v1 = Function(name='v1', grid=grid, space_order=2)
+    u1 = TimeFunction(name='u1', grid=grid, space_order=2, dtype=np.float64)
+    v1 = Function(name='v1', grid=grid, space_order=2, dtype=np.float64)
     eq1 = Eq(v1.laplace, u1)
     petsc1 = PETScSolve(eq1, v1)
     with switchconfig(openmp=False):
@@ -744,8 +741,8 @@ def test_time_loop():
     assert 'ctx0->t1' not in rhs1
 
     # Non-modulo time stepping
-    u2 = TimeFunction(name='u2', grid=grid, space_order=2, save=5)
-    v2 = Function(name='v2', grid=grid, space_order=2, save=5)
+    u2 = TimeFunction(name='u2', grid=grid, space_order=2, save=5, dtype=np.float64)
+    v2 = Function(name='v2', grid=grid, space_order=2, save=5, dtype=np.float64)
     eq2 = Eq(v2.laplace, u2)
     petsc2 = PETScSolve(eq2, v2)
     with switchconfig(openmp=False):
@@ -771,7 +768,7 @@ def test_time_loop():
     assert 'ctx0->t1' in rhs3
 
     # Multiple petsc solves within the same time loop
-    v2 = Function(name='v2', grid=grid, space_order=2)
+    v2 = Function(name='v2', grid=grid, space_order=2, dtype=np.float64)
     eq4 = Eq(v1.laplace, u1)
     petsc4 = PETScSolve(eq4, v1)
     eq5 = Eq(v2.laplace, u1)
@@ -782,6 +779,30 @@ def test_time_loop():
 
     assert 'ctx0.t0 = t0' in body4
     assert body4.count('ctx0.t0 = t0') == 1
+
+
+@skipif('petsc')
+def test_solve_output():
+    """
+    Verify that PETScSolve returns the correct output for
+    simple cases e.g with the identity matrix.
+    """
+    grid = Grid(shape=(11, 11), dtype=np.float64)
+
+    u = Function(name='u', grid=grid, space_order=2, dtype=np.float64)
+    v = Function(name='v', grid=grid, space_order=2, dtype=np.float64)
+
+    # Solving Ax=b where A is the identity matrix
+    v.data[:] = 5.0
+    eqn = Eq(u, v)
+    petsc = PETScSolve(eqn, target=u)
+
+    with switchconfig(openmp=False):
+        op = Operator(petsc)
+
+    # Check the solve function returns the correct output
+    op.apply()
+    assert np.allclose(u.data, v.data)
 
 
 class TestCoupledLinear:

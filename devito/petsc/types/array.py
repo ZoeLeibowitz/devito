@@ -6,7 +6,7 @@ from devito.types.array import ArrayBasic
 from devito.finite_differences import Differentiable
 from devito.types.basic import AbstractFunction
 from devito.finite_differences.tools import fd_weights_registry
-from devito.tools import dtype_to_ctype, as_tuple
+from devito.tools import dtype_to_ctype, as_tuple, CustomDtype
 from devito.symbolics import FieldFromComposite
 
 
@@ -106,11 +106,10 @@ class PETScArray(ArrayBasic, Differentiable):
 
     @cached_property
     def _C_ctype(self):
-        # TODO: Switch to using PetscScalar instead of float/double
         # TODO: Use cat $PETSC_DIR/$PETSC_ARCH/lib/petsc/conf/petscvariables
         # | grep -E "PETSC_(SCALAR|PRECISION)" to determine the precision of
         # the user's PETSc configuration.
-        return POINTER(dtype_to_ctype(self.dtype))
+        return CustomDtype('PetscScalar', modifier= ' *')
 
     @property
     def symbolic_shape(self):
@@ -118,3 +117,7 @@ class PETScArray(ArrayBasic, Differentiable):
             FieldFromComposite('g%sm' % d.name, self.localinfo) for d in self.dimensions]
         # Reverse it since DMDA is setup backwards to Devito dimensions.
         return DimensionTuple(*field_from_composites[::-1], getters=self.dimensions)
+
+    @property
+    def _restrict_keyword(self):
+        return ''
