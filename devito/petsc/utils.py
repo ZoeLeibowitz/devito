@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from devito.tools import memoized_func
 
@@ -63,9 +64,8 @@ def get_petsc_variables():
     """
     petsc_dir = get_petsc_dir()
     petsc_arch = get_petsc_arch()
-    variables_path = os.path.join(
-        petsc_dir, petsc_arch, 'lib', 'petsc', 'conf', 'petscvariables'
-    )
+    path = [petsc_dir, petsc_arch, 'lib', 'petsc', 'conf', 'petscvariables']
+    variables_path = Path(*path)
 
     with open(variables_path) as fh:
         # Split lines on first '=' (assignment)
