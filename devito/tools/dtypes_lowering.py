@@ -8,7 +8,6 @@ from operator import mul
 
 import numpy as np
 from cgen import dtype_to_ctype as cgen_dtype_to_ctype
-
 from .utils import as_tuple
 
 __all__ = ['int2', 'int3', 'int4', 'float2', 'float3', 'float4', 'double2',  # noqa
