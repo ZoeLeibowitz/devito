@@ -55,3 +55,7 @@ class CPrinter(BasePrinter, C99CodePrinter):
 
     def _print_ImaginaryUnit(self, expr):
         return '_Complex_I'
+
+
+class PetscCPrinter(CPrinter):
+    _restrict_keyword = ''
