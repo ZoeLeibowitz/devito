@@ -3,9 +3,9 @@ import os
 import pytest
 
 from conftest import skipif
-from devito import (Grid, Function, TimeFunction, Eq, Operator, switchconfig,
+from devito import (Grid, Function, TimeFunction, Eq, Operator,
                     configuration, norm)
-from devito.ir.iet import (Call, ElementalFunction, Definition, DummyExpr,
+from devito.ir.iet import (Call, ElementalFunction,
                            FindNodes, retrieve_iteration_tree)
 from devito.types import Constant, LocalCompositeObject
 from devito.passes.iet.languages.C import CDataManager

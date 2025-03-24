@@ -1,7 +1,7 @@
 import os
 import numpy as np
 
-from devito import (Grid, Function, Eq, Operator, configuration, switchconfig)
+from devito import (Grid, Function, Eq, Operator, configuration)
 from devito.petsc import PETScSolve
 from devito.petsc.initialize import PetscInitialize
 configuration['compiler'] = 'custom'

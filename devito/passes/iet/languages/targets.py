@@ -1,4 +1,5 @@
-from devito.passes.iet.languages.C import CDataManager, COrchestrator, CPrinter, PetscCPrinter
+from devito.passes.iet.languages.C import (CDataManager, COrchestrator, CPrinter,
+                                           PetscCPrinter)
 from devito.passes.iet.languages.CXX import CXXPrinter
 from devito.passes.iet.languages.openmp import (SimdOmpizer, Ompizer, DeviceOmpizer,
                                                 OmpDataManager, DeviceOmpDataManager,
