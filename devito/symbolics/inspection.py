@@ -10,7 +10,8 @@ from devito.finite_differences.differentiable import IndexDerivative
 from devito.logger import warning
 from devito.symbolics.extended_dtypes import INT
 from devito.symbolics.extended_sympy import (CallFromPointer, Cast,
-                                             DefFunction, ReservedWord)
+                                             DefFunction, ReservedWord,
+                                             FieldFromPointer)
 from devito.symbolics.queries import q_routine
 from devito.tools import as_tuple, prod
 from devito.tools.dtypes_lowering import infer_dtype
@@ -307,12 +308,15 @@ def sympy_dtype(expr, base=None, default=None, smin=None):
     if expr is None:
         return default
 
-    # TODO: Edit/fix/update according to PR #2513
     dtypes = {base} - {None}
-    for i in expr.args:
-        dtype = getattr(i, 'dtype', None)
-        if dtype:
-            dtypes.add(dtype)
+    def inspect_args(e):
+        for arg in e.args:
+            try:
+                dtypes.add(arg.dtype)
+            except AttributeError:
+                inspect_args(arg) 
+
+    inspect_args(expr)
 
     dtype = infer_dtype(dtypes)
 
