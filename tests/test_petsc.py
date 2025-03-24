@@ -181,12 +181,12 @@ def test_petsc_cast():
     op2 = Operator(petsc2)
     op3 = Operator(petsc3)
 
-    assert 'double (* x_f1) = ' + \
-        '(double (*)) x_f1_vec;' in str(op1.ccode)
-    assert 'double (* x_f2)[info.gxm] = ' + \
-        '(double (*)[info.gxm]) x_f2_vec;' in str(op2.ccode)
-    assert 'double (* x_f3)[info.gym][info.gxm] = ' + \
-        '(double (*)[info.gym][info.gxm]) x_f3_vec;' in str(op3.ccode)
+    assert 'PetscScalar (* x_f1) = ' + \
+        '(PetscScalar (*)) x_f1_vec;' in str(op1.ccode)
+    assert 'PetscScalar (* x_f2)[info.gxm] = ' + \
+        '(PetscScalar (*)[info.gxm]) x_f2_vec;' in str(op2.ccode)
+    assert 'PetscScalar (* x_f3)[info.gym][info.gxm] = ' + \
+        '(PetscScalar (*)[info.gym][info.gxm]) x_f3_vec;' in str(op3.ccode)
 
 
 @skipif('petsc')
@@ -661,7 +661,7 @@ def test_start_ptr():
     op1 = Operator(petsc1)
 
     # Verify the case with modulo time stepping
-    assert 'double * u1_ptr0 = t1*localsize0 + (double*)(u1_vec->data);' in str(op1)
+    assert 'PetscScalar * u1_ptr0 = t1*localsize0 + (PetscScalar*)(u1_vec->data);' in str(op1)
 
     # Verify the case with no modulo time stepping
     u2 = TimeFunction(name='u2', grid=grid, space_order=2, save=5)
@@ -670,8 +670,8 @@ def test_start_ptr():
 
     op2 = Operator(petsc2)
 
-    assert 'double * u2_ptr0 = (time + 1)*localsize0 + ' + \
-        '(double*)(u2_vec->data);' in str(op2)
+    assert 'PetscScalar * u2_ptr0 = (time + 1)*localsize0 + ' + \
+        '(PetscScalar*)(u2_vec->data);' in str(op2)
 
 
 @skipif('petsc')

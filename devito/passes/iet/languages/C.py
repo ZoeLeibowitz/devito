@@ -1,4 +1,5 @@
 import numpy as np
+import ctypes
 from sympy.printing.c import C99CodePrinter
 
 from devito.ir import Call, BasePrinter
@@ -59,3 +60,7 @@ class CPrinter(BasePrinter, C99CodePrinter):
 
 class PetscCPrinter(CPrinter):
     _restrict_keyword = ''
+
+    type_mappings = {ctypes.c_int: 'PetscInt',
+                     ctypes.c_float: 'PetscScalar',
+                     ctypes.c_double: 'PetscScalar'}
