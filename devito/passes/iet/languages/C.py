@@ -60,7 +60,7 @@ class CPrinter(BasePrinter, C99CodePrinter):
 
 class PetscCPrinter(CPrinter):
     _restrict_keyword = ''
-    
+
     # TODO: Check to see whether Petsc is compiled with
     # 32-bit or 64-bit integers
     type_mappings = {ctypes.c_int: 'PetscInt',
