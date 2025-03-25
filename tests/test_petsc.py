@@ -672,7 +672,7 @@ def test_start_ptr():
 
     # Verify the case with modulo time stepping
     assert ('PetscScalar * u1_ptr0 = t1*localsize0 + '
-        '(PetscScalar*)(u1_vec->data);') in str(op1)
+            '(PetscScalar*)(u1_vec->data);') in str(op1)
 
     # Verify the case with no modulo time stepping
     u2 = TimeFunction(name='u2', grid=grid, space_order=2, save=5)
@@ -683,7 +683,7 @@ def test_start_ptr():
         op2 = Operator(petsc2)
 
     assert ('PetscScalar * u2_ptr0 = (time + 1)*localsize0 + '
-        '(PetscScalar*)(u2_vec->data);') in str(op2)
+            '(PetscScalar*)(u2_vec->data);') in str(op2)
 
 
 @skipif('petsc')
