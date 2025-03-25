@@ -775,8 +775,8 @@ def test_solve_output():
 
     with switchconfig(language='petsc'):
         op = Operator(petsc)
-    # Check the solve function returns the correct output
-    op.apply()
+        # Check the solve function returns the correct output
+        op.apply()
 
     assert np.allclose(u.data, v.data)
 

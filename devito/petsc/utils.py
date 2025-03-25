@@ -1,5 +1,6 @@
 import os
 
+from pathlib import Path
 from devito.tools import memoized_func
 
 
@@ -51,3 +52,30 @@ def core_metadata():
         'lib_dirs': lib_dir,
         'ldflags': ('-Wl,-rpath,%s' % lib_dir)
     }
+
+
+@memoized_func
+def get_petsc_variables():
+    """
+    Taken from https://www.firedrakeproject.org/_modules/firedrake/petsc.html
+    Get a dict of PETSc environment variables from the file:
+    $PETSC_DIR/$PETSC_ARCH/lib/petsc/conf/petscvariables
+    """
+    petsc_dir = get_petsc_dir()
+    petsc_arch = get_petsc_arch()
+    path = [petsc_dir, petsc_arch, 'lib', 'petsc', 'conf', 'petscvariables']
+    variables_path = Path(*path)
+
+    with open(variables_path) as fh:
+        # Split lines on first '=' (assignment)
+        splitlines = (line.split("=", maxsplit=1) for line in fh.readlines())
+    return {k.strip(): v.strip() for k, v in splitlines}
+
+
+@memoized_func
+def get_petsc_precision():
+    """
+    Get the PETSc precision.
+    """
+    petsc_variables = get_petsc_variables()
+    return petsc_variables['PETSC_PRECISION']
