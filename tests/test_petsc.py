@@ -705,6 +705,7 @@ def test_time_loop():
 
     with switchconfig(language='petsc'):
         op1 = Operator(petsc1)
+        op1.apply(time_M=3)
     body1 = str(op1.body)
     rhs1 = str(op1._func_table['FormRHS0'].root.ccode)
 
@@ -721,6 +722,7 @@ def test_time_loop():
 
     with switchconfig(language='petsc'):
         op2 = Operator(petsc2)
+        op2.apply(time_M=3)
     body2 = str(op2.body)
     rhs2 = str(op2._func_table['FormRHS0'].root.ccode)
 
@@ -734,6 +736,7 @@ def test_time_loop():
 
     with switchconfig(language='petsc'):
         op3 = Operator(petsc3)
+        op3.apply(time_M=3)
     body3 = str(op3.body)
     rhs3 = str(op3._func_table['FormRHS0'].root.ccode)
 
@@ -751,6 +754,7 @@ def test_time_loop():
 
     with switchconfig(language='petsc'):
         op4 = Operator(petsc4 + petsc5)
+        op4.apply(time_M=3)
     body4 = str(op4.body)
 
     assert 'ctx0.t0 = t0' in body4

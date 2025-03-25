@@ -188,7 +188,6 @@ class VecScatter(LocalObject):
 class StartPtr(LocalObject):
     def __init__(self, name, dtype):
         super().__init__(name=name)
-        # self.dtype = CustomDtype(dtype_to_cstr(dtype), modifier=' *')
         self.dtype = POINTER(dtype_to_ctype(dtype))
 
 
