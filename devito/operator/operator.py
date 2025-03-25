@@ -155,7 +155,7 @@ class Operator(Callable):
         kwargs = parse_kwargs(**kwargs)
 
         # The Operator type for the given target
-        cls = operator_selector(**kwargs)
+        cls = operator_selector(expressions, **kwargs)
 
         # Preprocess input arguments
         kwargs = cls._normalize_kwargs(**kwargs)
@@ -1172,11 +1172,11 @@ def rcompile(expressions, kwargs, options, target=None):
     options = {**options, **rcompile_registry}
 
     if target is None:
-        cls = operator_selector(**kwargs)
+        cls = operator_selector(expressions, **kwargs)
         kwargs['options'] = options
     else:
         kwargs = parse_kwargs(**target)
-        cls = operator_selector(**kwargs)
+        cls = operator_selector(expressions, **kwargs)
         kwargs = cls._normalize_kwargs(**kwargs)
         kwargs['options'].update(options)
 

@@ -350,6 +350,11 @@ class Cpu64CXXNoopOmpOperator(Cpu64NoopOperator):
 class Cpu64NoopPetscOperator(Cpu64NoopOperator):
     _Target = PetscTarget
 
+    @classmethod
+    def _rcompile_wrapper(cls, **kwargs0):
+        kwargs0['language'] = 'petsc'
+        return super()._rcompile_wrapper(**kwargs0)
+
 
 class Cpu64AdvCOperator(Cpu64AdvOperator):
     _Target = CTarget
@@ -362,6 +367,11 @@ class Cpu64AdvCXXOperator(Cpu64AdvOperator):
 
 class Cpu64AdvPetscOperator(Cpu64AdvOperator):
     _Target = PetscTarget
+
+    @classmethod
+    def _rcompile_wrapper(cls, **kwargs0):
+        kwargs0['language'] = 'petsc'
+        return super()._rcompile_wrapper(**kwargs0)
 
 
 class Cpu64AdvOmpOperator(Cpu64AdvOperator):

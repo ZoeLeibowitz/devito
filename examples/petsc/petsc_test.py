@@ -9,7 +9,6 @@ os.environ['CC'] = 'mpicc'
 
 PetscInitialize()
 
-
 nx = 81
 ny = 81
 
@@ -24,6 +23,8 @@ eq = Eq(v, u.laplace, subdomain=grid.interior)
 
 petsc = PETScSolve([eq], u)
 
-with switchconfig(language='petsc'):
-    op = Operator(petsc)
-    op.apply()
+op = Operator(petsc)
+
+op.apply()
+
+print(op.ccode)
