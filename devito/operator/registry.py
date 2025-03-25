@@ -3,7 +3,7 @@ from itertools import product
 
 from devito.arch import Platform
 from devito.exceptions import InvalidOperator
-from devito.tools import Singleton
+from devito.tools import Singleton, as_tuple
 from devito.types.equation import PetscEq
 
 __all__ = ['operator_registry', 'operator_selector']
@@ -61,7 +61,9 @@ class OperatorRegistry(OrderedDict, metaclass=Singleton):
         """
         Infer the appropriate language based on the expressions.
         """
-        return 'petsc' if any(isinstance(eq, PetscEq) for eq in expressions) else language
+        return 'petsc' if any(
+            isinstance(eq, PetscEq) for eq in as_tuple(expressions)
+        ) else language
 
 
 operator_registry = OperatorRegistry()
