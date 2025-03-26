@@ -68,7 +68,10 @@ def get_petsc_variables():
     return {k.strip(): v.strip() for k, v in splitlines}
 
 
-petsc_variables = get_petsc_variables()
+try:
+    petsc_variables = get_petsc_variables()
+except PetscOSError:
+    petsc_variables = {}
 
 # TODO: Check to see whether Petsc is compiled with
 # 32-bit or 64-bit integers
