@@ -59,7 +59,8 @@ class PETScArray(ArrayBasic, Differentiable):
 
     @classmethod
     def __indices_setup__(cls, *args, **kwargs):
-        dimensions = kwargs['target'].space_dimensions
+        target = kwargs['target']
+        dimensions = tuple(target.indices[d] for d in target.space_dimensions)
         if args:
             indices = args
         else:
