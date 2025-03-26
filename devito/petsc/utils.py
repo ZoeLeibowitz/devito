@@ -61,15 +61,17 @@ def get_petsc_variables():
     try:
         petsc_dir = get_petsc_dir()
     except PetscOSError:
-        return {}
+        petsc_variables = {}
+    else:
+        path = [petsc_dir[-1], 'lib', 'petsc', 'conf', 'petscvariables']
+        variables_path = Path(*path)
 
-    path = [petsc_dir[-1], 'lib', 'petsc', 'conf', 'petscvariables']
-    variables_path = Path(*path)
-
-    with open(variables_path) as fh:
-        # Split lines on first '=' (assignment)
-        splitlines = (line.split("=", maxsplit=1) for line in fh.readlines())
-    return {k.strip(): v.strip() for k, v in splitlines}
+        with open(variables_path) as fh:
+            # Split lines on first '=' (assignment)
+            splitlines = (line.split("=", maxsplit=1) for line in fh.readlines())
+        petsc_variables = {k.strip(): v.strip() for k, v in splitlines}
+        
+    return petsc_variables
 
 
 petsc_variables = get_petsc_variables()
