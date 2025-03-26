@@ -70,7 +70,7 @@ def get_petsc_variables():
             # Split lines on first '=' (assignment)
             splitlines = (line.split("=", maxsplit=1) for line in fh.readlines())
         petsc_variables = {k.strip(): v.strip() for k, v in splitlines}
-        
+
     return petsc_variables
 
 
