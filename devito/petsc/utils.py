@@ -1,4 +1,5 @@
 import os
+import ctypes
 
 from pathlib import Path
 from devito.tools import memoized_func
@@ -20,26 +21,26 @@ def get_petsc_dir():
     petsc_dir = os.environ.get('PETSC_DIR')
     if petsc_dir is None:
         raise PetscOSError("PETSC_DIR environment variable not set")
+    else:
+        petsc_dir = (Path(petsc_dir),)
+
+    petsc_arch = os.environ.get('PETSC_ARCH')
+    if petsc_arch is not None:
+        petsc_dir += (petsc_dir[0] / petsc_arch,)
+
+    petsc_installed = petsc_dir[-1] / 'include' / 'petscconf.h'
+    if not petsc_installed.is_file():
+        raise PetscOSError("PETSc is not installed")
+
     return petsc_dir
-
-
-@memoized_func
-def get_petsc_arch():
-    # Note: users don't have to explicitly set PETSC_ARCH
-    # if they add it to the PETSC_DIR path
-    return os.environ.get('PETSC_ARCH')
 
 
 @memoized_func
 def core_metadata():
     petsc_dir = get_petsc_dir()
-    petsc_arch = get_petsc_arch()
 
-    petsc_include = (os.path.join(petsc_dir, 'include'),)
-    petsc_lib = (os.path.join(petsc_dir, 'lib'),)
-    if petsc_arch:
-        petsc_include += (os.path.join(petsc_dir, petsc_arch, 'include'),)
-        petsc_lib += (os.path.join(petsc_dir, petsc_arch, 'lib'),)
+    petsc_include = tuple([arch / 'include' for arch in petsc_dir])
+    petsc_lib = tuple([arch / 'lib' for arch in petsc_dir])
 
     return {
         'includes': ('petscsnes.h', 'petscdmda.h'),
@@ -58,8 +59,7 @@ def get_petsc_variables():
     $PETSC_DIR/$PETSC_ARCH/lib/petsc/conf/petscvariables
     """
     petsc_dir = get_petsc_dir()
-    petsc_arch = get_petsc_arch()
-    path = [petsc_dir, petsc_arch, 'lib', 'petsc', 'conf', 'petscvariables']
+    path = [petsc_dir[-1], 'lib', 'petsc', 'conf', 'petscvariables']
     variables_path = Path(*path)
 
     with open(variables_path) as fh:
@@ -68,13 +68,14 @@ def get_petsc_variables():
     return {k.strip(): v.strip() for k, v in splitlines}
 
 
-@memoized_func
-def get_petsc_precision():
-    """
-    Get the PETSc precision.
-    """
-    petsc_variables = get_petsc_variables()
-    return petsc_variables['PETSC_PRECISION']
+petsc_variables = get_petsc_variables()
 
+# TODO: Check to see whether Petsc is compiled with
+# 32-bit or 64-bit integers
+# TODO: Check whether PetscScalar is a float or double
+# and only map the right one
+petsc_type_mappings = {ctypes.c_int: 'PetscInt',
+                       ctypes.c_float: 'PetscScalar',
+                       ctypes.c_double: 'PetscScalar'}
 
 petsc_languages = ['petsc']

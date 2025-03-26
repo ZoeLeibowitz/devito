@@ -2,7 +2,7 @@ import sympy
 
 from devito.tools import Reconstructable, sympy_mutex
 from devito.tools.dtypes_lowering import dtype_mapper
-from devito.petsc.utils import get_petsc_precision
+from devito.petsc.utils import petsc_variables
 
 
 class MetaData(sympy.Function, Reconstructable):
@@ -135,7 +135,7 @@ class FieldData:
                  arrays=None, **kwargs):
         self._target = kwargs.get('target', target)
 
-        petsc_precision = dtype_mapper[get_petsc_precision()]
+        petsc_precision = dtype_mapper[petsc_variables['PETSC_PRECISION']]
         if self._target.dtype != petsc_precision:
             raise TypeError(
                 f"Your target dtype must match the precision of your "

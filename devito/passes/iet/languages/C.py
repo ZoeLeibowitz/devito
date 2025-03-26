@@ -1,5 +1,4 @@
 import numpy as np
-import ctypes
 from sympy.printing.c import C99CodePrinter
 
 from devito.ir import Call, BasePrinter
@@ -7,6 +6,7 @@ from devito.passes.iet.definitions import DataManager
 from devito.passes.iet.orchestration import Orchestrator
 from devito.passes.iet.langbase import LangBB
 from devito.symbolics.extended_dtypes import c_complex, c_double_complex
+from devito.petsc.utils import petsc_type_mappings
 
 __all__ = ['CBB', 'CDataManager', 'COrchestrator']
 
@@ -61,8 +61,4 @@ class CPrinter(BasePrinter, C99CodePrinter):
 class PetscCPrinter(CPrinter):
     _restrict_keyword = ''
 
-    # TODO: Check to see whether Petsc is compiled with
-    # 32-bit or 64-bit integers
-    type_mappings = {ctypes.c_int: 'PetscInt',
-                     ctypes.c_float: 'PetscScalar',
-                     ctypes.c_double: 'PetscScalar'}
+    type_mappings = {**CPrinter.type_mappings, **petsc_type_mappings}
