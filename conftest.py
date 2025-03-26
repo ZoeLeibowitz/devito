@@ -96,7 +96,7 @@ def skipif(items, whole_module=False):
             break
         if i == 'petsc':
             try:
-                petsc_dir = get_petsc_dir()
+                _ = get_petsc_dir()
             except PetscOSError:
                 skipit = "PETSc is not installed"
                 break
