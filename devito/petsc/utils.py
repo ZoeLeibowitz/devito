@@ -61,7 +61,7 @@ def get_petsc_variables():
     try:
         petsc_dir = get_petsc_dir()
     except PetscOSError:
-       return {}
+        return {}
 
     path = [petsc_dir[-1], 'lib', 'petsc', 'conf', 'petscvariables']
     variables_path = Path(*path)
