@@ -58,7 +58,11 @@ def get_petsc_variables():
     Get a dict of PETSc environment variables from the file:
     $PETSC_DIR/$PETSC_ARCH/lib/petsc/conf/petscvariables
     """
-    petsc_dir = get_petsc_dir()
+    try:
+        petsc_dir = get_petsc_dir()
+    except PetscOSError:
+       return {}
+
     path = [petsc_dir[-1], 'lib', 'petsc', 'conf', 'petscvariables']
     variables_path = Path(*path)
 
@@ -68,10 +72,7 @@ def get_petsc_variables():
     return {k.strip(): v.strip() for k, v in splitlines}
 
 
-try:
-    petsc_variables = get_petsc_variables()
-except PetscOSError:
-    petsc_variables = {}
+petsc_variables = get_petsc_variables()
 
 # TODO: Check to see whether Petsc is compiled with
 # 32-bit or 64-bit integers
