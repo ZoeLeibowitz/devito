@@ -3,8 +3,7 @@ from itertools import product
 
 from devito.arch import Platform
 from devito.exceptions import InvalidOperator
-from devito.tools import Singleton, as_tuple
-from devito.types.equation import PetscEq
+from devito.tools import Singleton
 
 __all__ = ['operator_registry', 'operator_selector']
 
@@ -45,7 +44,6 @@ class OperatorRegistry(OrderedDict, metaclass=Singleton):
             # Optimization given as an arbitrary sequence of passes
             mode = 'custom'
 
-        language = self.infer_language(expressions, language)
         if language not in OperatorRegistry._languages:
             raise ValueError("Unknown language `%s`" % language)
 
@@ -56,14 +54,6 @@ class OperatorRegistry(OrderedDict, metaclass=Singleton):
 
         raise InvalidOperator("Cannot compile an Operator for `%s`"
                               % str((platform, mode, language)))
-
-    def infer_language(self, expressions, language='C'):
-        """
-        Infer the appropriate language based on the expressions.
-        """
-        return 'petsc' if any(
-            isinstance(eq, PetscEq) for eq in as_tuple(expressions)
-        ) else language
 
 
 operator_registry = OperatorRegistry()

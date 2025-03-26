@@ -4,7 +4,7 @@ import pytest
 
 from conftest import skipif
 from devito import (Grid, Function, TimeFunction, Eq, Operator,
-                    configuration, norm)
+                    configuration, norm, switchconfig)
 from devito.ir.iet import (Call, ElementalFunction,
                            FindNodes, retrieve_iteration_tree)
 from devito.types import Constant, LocalCompositeObject
@@ -94,7 +94,8 @@ def test_petsc_solve():
 
     petsc = PETScSolve(eqn, f)
 
-    op = Operator(petsc, opt='noop')
+    with switchconfig(language='petsc'):
+        op = Operator(petsc, opt='noop')
 
     callable_roots = [meta_call.root for meta_call in op._func_table.values()]
 
@@ -147,7 +148,8 @@ def test_multiple_petsc_solves():
     petsc1 = PETScSolve(eqn1, f1)
     petsc2 = PETScSolve(eqn2, f2)
 
-    op = Operator(petsc1+petsc2, opt='noop')
+    with switchconfig(language='petsc'):
+        op = Operator(petsc1+petsc2, opt='noop')
 
     callable_roots = [meta_call.root for meta_call in op._func_table.values()]
 
@@ -176,9 +178,10 @@ def test_petsc_cast():
     petsc2 = PETScSolve(eqn2, f2)
     petsc3 = PETScSolve(eqn3, f3)
 
-    op1 = Operator(petsc1)
-    op2 = Operator(petsc2)
-    op3 = Operator(petsc3)
+    with switchconfig(language='petsc'):
+        op1 = Operator(petsc1)
+        op2 = Operator(petsc2)
+        op3 = Operator(petsc3)
 
     assert 'PetscScalar (* x_f1) = ' + \
         '(PetscScalar (*)) x_f1_vec;' in str(op1.ccode)
@@ -225,9 +228,10 @@ def test_dmda_create():
     petsc2 = PETScSolve(eqn2, f2)
     petsc3 = PETScSolve(eqn3, f3)
 
-    op1 = Operator(petsc1, opt='noop')
-    op2 = Operator(petsc2, opt='noop')
-    op3 = Operator(petsc3, opt='noop')
+    with switchconfig(language='petsc'):
+        op1 = Operator(petsc1, opt='noop')
+        op2 = Operator(petsc2, opt='noop')
+        op3 = Operator(petsc3, opt='noop')
 
     assert 'PetscCall(DMDACreate1d(PETSC_COMM_WORLD,DM_BOUNDARY_GHOSTED,' + \
         '2,1,2,NULL,&(da0)));' in str(op1)
@@ -251,7 +255,8 @@ def test_cinterface_petsc_struct():
 
     name = "foo"
 
-    op = Operator(petsc, name=name)
+    with switchconfig(language='petsc'):
+        op = Operator(petsc, name=name)
 
     # Trigger the generation of a .c and a .h files
     ccode, hcode = op.cinterface(force=True)
@@ -532,7 +537,8 @@ def test_callback_arguments():
 
     petsc1 = PETScSolve(eqn1, f1)
 
-    op = Operator(petsc1)
+    with switchconfig(language='petsc'):
+        op = Operator(petsc1)
 
     mv = op._func_table['MatMult0'].root
     ff = op._func_table['FormFunction0'].root
@@ -560,7 +566,8 @@ def test_petsc_struct():
 
     eqn2 = Eq(f1, g1*mu2)
 
-    op = Operator([eqn2] + petsc1)
+    with switchconfig(language='petsc'):
+        op = Operator([eqn2] + petsc1)
 
     arguments = op.arguments()
 
@@ -589,11 +596,12 @@ def test_apply():
 
     petsc = PETScSolve(eqn, pn)
 
-    # Build the op
-    op = Operator(petsc)
+    with switchconfig(language='petsc'):
+        # Build the op
+        op = Operator(petsc)
 
-    # Check the Operator runs without errors
-    op.apply()
+        # Check the Operator runs without errors
+        op.apply()
 
     # Verify that users can override `mu`
     mu_new = Constant(name='mu_new', value=4.0)
@@ -611,7 +619,8 @@ def test_petsc_frees():
     eqn = Eq(f.laplace, g)
     petsc = PETScSolve(eqn, f)
 
-    op = Operator(petsc)
+    with switchconfig(language='petsc'):
+        op = Operator(petsc)
 
     frees = op.body.frees
 
@@ -634,7 +643,8 @@ def test_calls_to_callbacks():
     eqn = Eq(f.laplace, g)
     petsc = PETScSolve(eqn, f)
 
-    op = Operator(petsc)
+    with switchconfig(language='petsc'):
+        op = Operator(petsc)
 
     ccode = str(op.ccode)
 
@@ -657,7 +667,8 @@ def test_start_ptr():
     eq1 = Eq(u1.dt, u1.laplace, subdomain=grid.interior)
     petsc1 = PETScSolve(eq1, u1.forward)
 
-    op1 = Operator(petsc1)
+    with switchconfig(language='petsc'):
+        op1 = Operator(petsc1)
 
     # Verify the case with modulo time stepping
     assert ('PetscScalar * u1_ptr0 = t1*localsize0 + '
@@ -668,7 +679,8 @@ def test_start_ptr():
     eq2 = Eq(u2.dt, u2.laplace, subdomain=grid.interior)
     petsc2 = PETScSolve(eq2, u2.forward)
 
-    op2 = Operator(petsc2)
+    with switchconfig(language='petsc'):
+        op2 = Operator(petsc2)
 
     assert ('PetscScalar * u2_ptr0 = (time + 1)*localsize0 + '
             '(PetscScalar*)(u2_vec->data);') in str(op2)
@@ -691,8 +703,9 @@ def test_time_loop():
     eq1 = Eq(v1.laplace, u1)
     petsc1 = PETScSolve(eq1, v1)
 
-    op1 = Operator(petsc1)
-    op1.apply(time_M=3)
+    with switchconfig(language='petsc'):
+        op1 = Operator(petsc1)
+        op1.apply(time_M=3)
     body1 = str(op1.body)
     rhs1 = str(op1._func_table['FormRHS0'].root.ccode)
 
@@ -707,8 +720,9 @@ def test_time_loop():
     eq2 = Eq(v2.laplace, u2)
     petsc2 = PETScSolve(eq2, v2)
 
-    op2 = Operator(petsc2)
-    op2.apply(time_M=3)
+    with switchconfig(language='petsc'):
+        op2 = Operator(petsc2)
+        op2.apply(time_M=3)
     body2 = str(op2.body)
     rhs2 = str(op2._func_table['FormRHS0'].root.ccode)
 
@@ -720,8 +734,9 @@ def test_time_loop():
     eq3 = Eq(v1.laplace, u1 + u1.forward)
     petsc3 = PETScSolve(eq3, v1)
 
-    op3 = Operator(petsc3)
-    op3.apply(time_M=3)
+    with switchconfig(language='petsc'):
+        op3 = Operator(petsc3)
+        op3.apply(time_M=3)
     body3 = str(op3.body)
     rhs3 = str(op3._func_table['FormRHS0'].root.ccode)
 
@@ -737,8 +752,9 @@ def test_time_loop():
     eq5 = Eq(v2.laplace, u1)
     petsc5 = PETScSolve(eq5, v2)
 
-    op4 = Operator(petsc4 + petsc5)
-    op4.apply(time_M=3)
+    with switchconfig(language='petsc'):
+        op4 = Operator(petsc4 + petsc5)
+        op4.apply(time_M=3)
     body4 = str(op4.body)
 
     assert 'ctx0.t0 = t0' in body4
@@ -761,9 +777,10 @@ def test_solve_output():
     eqn = Eq(u, v)
     petsc = PETScSolve(eqn, target=u)
 
-    op = Operator(petsc)
-    # Check the solve function returns the correct output
-    op.apply()
+    with switchconfig(language='petsc'):
+        op = Operator(petsc)
+        # Check the solve function returns the correct output
+        op.apply()
 
     assert np.allclose(u.data, v.data)
 
@@ -794,8 +811,9 @@ class TestCoupledLinear:
         petsc1 = PETScSolve(eq1, target=e)
         petsc2 = PETScSolve(eq2, target=g)
 
-        op1 = Operator(petsc1 + petsc2, opt='noop')
-        op1.apply()
+        with switchconfig(language='petsc'):
+            op1 = Operator(petsc1 + petsc2, opt='noop')
+            op1.apply()
 
         enorm1 = norm(e)
         gnorm1 = norm(g)
@@ -809,8 +827,9 @@ class TestCoupledLinear:
         # using a dict for now
         petsc3 = PETScSolve({e: [eq1], g: [eq2]})
 
-        op2 = Operator(petsc3, opt='noop')
-        op2.apply()
+        with switchconfig(language='petsc'):
+            op2 = Operator(petsc3, opt='noop')
+            op2.apply()
 
         enorm2 = norm(e)
         gnorm2 = norm(g)
@@ -852,7 +871,8 @@ class TestCoupledLinear:
 
         name = "foo"
 
-        op = Operator(petsc, name=name)
+        with switchconfig(language='petsc'):
+            op = Operator(petsc, name=name)
 
         # Trigger the generation of a .c and a .h files
         ccode, hcode = op.cinterface(force=True)
@@ -893,8 +913,9 @@ class TestCoupledLinear:
         petsc1 = PETScSolve({e: [eq1], f: [eq2]})
         petsc2 = PETScSolve({e: [eq1], f: [eq2], g: [eq3]})
 
-        op1 = Operator(petsc1, opt='noop')
-        op2 = Operator(petsc2, opt='noop')
+        with switchconfig(language='petsc'):
+            op1 = Operator(petsc1, opt='noop')
+            op2 = Operator(petsc2, opt='noop')
 
         frees1 = op1.body.frees
         frees2 = op2.body.frees
@@ -937,9 +958,10 @@ class TestCoupledLinear:
         petsc2 = PETScSolve({e: [eq1], f: [eq2]})
         petsc3 = PETScSolve({e: [eq1], f: [eq2], g: [eq3]})
 
-        op1 = Operator(petsc1, opt='noop')
-        op2 = Operator(petsc2, opt='noop')
-        op3 = Operator(petsc3, opt='noop')
+        with switchconfig(language='petsc'):
+            op1 = Operator(petsc1, opt='noop')
+            op2 = Operator(petsc2, opt='noop')
+            op3 = Operator(petsc3, opt='noop')
 
         # Check the number of dofs in the DMDA for each field
         assert 'PetscCall(DMDACreate2d(PETSC_COMM_WORLD,DM_BOUNDARY_GHOSTED,' + \

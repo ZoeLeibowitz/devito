@@ -75,3 +75,6 @@ def get_petsc_precision():
     """
     petsc_variables = get_petsc_variables()
     return petsc_variables['PETSC_PRECISION']
+
+
+petsc_languages = ['petsc']
