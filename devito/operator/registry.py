@@ -36,7 +36,7 @@ class OperatorRegistry(OrderedDict, metaclass=Singleton):
 
         self[(platform, mode, language)] = operator
 
-    def fetch(self, expressions, platform=None, mode=None, language='C', **kwargs):
+    def fetch(self, platform=None, mode=None, language='C', **kwargs):
         """
         Retrieve an Operator for the given `<platform, mode, language>`.
         """
