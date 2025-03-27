@@ -4,6 +4,7 @@ from ctypes.util import find_library
 import mmap
 import os
 import sys
+from pathlib import Path
 
 import numpy as np
 
@@ -11,9 +12,10 @@ from devito.logger import logger
 from devito.parameters import configuration
 from devito.tools import is_integer, infer_datasize
 
+
 __all__ = ['ALLOC_ALIGNED', 'ALLOC_NUMA_LOCAL', 'ALLOC_NUMA_ANY',
            'ALLOC_KNL_MCDRAM', 'ALLOC_KNL_DRAM', 'ALLOC_GUARD',
-           'default_allocator']
+           'ALLOC_PETSC', 'default_allocator']
 
 
 class AbstractMemoryAllocator:
@@ -102,6 +104,7 @@ class MemoryAllocator(AbstractMemoryAllocator):
         size = datasize + padleft + padright
 
         padleft_pointer, memfree_args = self._alloc_C_libcall(size, ctype)
+
         if padleft_pointer is None:
             raise RuntimeError("Unable to allocate %d elements in memory" % size)
 
@@ -334,6 +337,31 @@ class NumaAllocator(MemoryAllocator):
         return self._node == 'local'
 
 
+class PetscMemoryAllocator(MemoryAllocator):
+    """
+    """
+    @classmethod
+    def initialize(cls):
+        from devito.petsc.utils import core_metadata
+        metadata = core_metadata()
+        lib_dir = Path(metadata['lib_dirs'][-1])
+
+        try:
+            cls.lib = ctypes.CDLL(lib_dir/'libpetsc.so')
+        except OSError:
+            cls.lib = None
+
+    def _alloc_C_libcall(self, size, ctype):
+        if not self.available():
+            raise RuntimeError("...")
+        c_bytesize = ctypes.c_ulong(size * ctypes.sizeof(ctype))
+        c_pointer = ctypes.cast(ctypes.c_void_p(), ctypes.c_void_p)
+
+        from devito.petsc.memory import op_memory
+        op_memory(m=c_bytesize, result=ctypes.byref(c_pointer))
+        return c_pointer, (c_pointer, )
+
+
 class DataReference(MemoryAllocator):
 
     """
@@ -393,6 +421,7 @@ ALLOC_KNL_DRAM = NumaAllocator(0)
 ALLOC_KNL_MCDRAM = NumaAllocator(1)
 ALLOC_NUMA_ANY = NumaAllocator('any')
 ALLOC_NUMA_LOCAL = NumaAllocator('local')
+ALLOC_PETSC = PetscMemoryAllocator()
 
 custom_allocators = {
     'fallback': ALLOC_ALIGNED,
