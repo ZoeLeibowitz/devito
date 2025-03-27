@@ -1,13 +1,7 @@
-import os
-import sys
-from ctypes import POINTER, cast, c_char
-import atexit
-
 from devito import Operator, switchconfig
 from devito.types import Symbol
 from devito.types.equation import PetscEq
-from devito.petsc.types import Initialize, Finalize, AllocateMemory
-
+from devito.petsc.types import AllocateMemory
 
 
 dummy = Symbol(name='d')

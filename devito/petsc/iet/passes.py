@@ -6,8 +6,8 @@ from devito.passes.iet.engine import iet_pass
 from devito.ir.iet import (Transformer, MapNodes, Iteration, BlankLine,
                            DummyExpr, CallableBody, List, Call, Callable,
                            FindNodes)
-from devito.symbolics import Byref, Macro, FieldFromPointer, VOID
-from devito.types import Symbol, Scalar, Symbol
+from devito.symbolics import Byref, Macro, FieldFromPointer
+from devito.types import Symbol, Scalar
 from devito.types.basic import DataSymbol
 from devito.tools import frozendict
 from devito.petsc.types import (PetscMPIInt, PetscErrorCode, MultipleFieldData,
@@ -121,7 +121,7 @@ def allocate_memory(iet):
     m = SizeT(name="m")
     # Memory allocated
     result = VoidPtrPtr(name='result')
-    
+
     allocate_body = petsc_call('PetscMalloc', [m, result])
     allocate_body = CallableBody(
         body=(petsc_func_begin_user, allocate_body),

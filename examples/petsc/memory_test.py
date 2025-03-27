@@ -19,22 +19,16 @@ ny = 81
 
 grid = Grid(shape=(nx, ny), extent=(2., 2.), dtype=np.float64)
 
+# Only need to allocate the "target" function memory via PETSc
 u = Function(name='u', grid=grid, dtype=np.float64, space_order=2, allocator=ALLOC_PETSC)
-v = Function(name='v', grid=grid, dtype=np.float64, space_order=2, allocator=ALLOC_PETSC)
+v = Function(name='v', grid=grid, dtype=np.float64, space_order=2)
 
 v.data[:] = 5.0
 
 eq = Eq(v, u.laplace, subdomain=grid.interior)
 
-petsc = PETScSolve([eq], u)
-
+petsc = PETScSolve([eq], target=u)
 
 with switchconfig(language='petsc'):
     op = Operator(petsc)
-
-
-# print(op.ccode)
-op.apply()
-
-
-
+    op.apply()
