@@ -3,11 +3,8 @@ import numpy as np
 
 from devito import (Grid, Function, Eq, Operator, configuration,
                     switchconfig)
-from devito.types import Symbol
-from devito.types.equation import PetscEq
 from devito.data.allocators import ALLOC_PETSC
 from devito.petsc import PETScSolve
-from devito.petsc.types import AllocateMemory
 from devito.petsc.initialize import PetscInitialize
 configuration['compiler'] = 'custom'
 os.environ['CC'] = 'mpicc'
