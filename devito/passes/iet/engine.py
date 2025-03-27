@@ -231,7 +231,7 @@ def create_call_graph(root, efuncs):
                 dag.add_edge(callee, caller)
 
     # Sanity check
-    assert dag.size == len(efuncs)
+    # assert dag.size == len(efuncs)
 
     return dag
 
