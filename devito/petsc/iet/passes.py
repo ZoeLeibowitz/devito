@@ -6,15 +6,16 @@ from devito.passes.iet.engine import iet_pass
 from devito.ir.iet import (Transformer, MapNodes, Iteration, BlankLine,
                            DummyExpr, CallableBody, List, Call, Callable,
                            FindNodes)
-from devito.symbolics import Byref, Macro, FieldFromPointer
-from devito.types import Symbol, Scalar
+from devito.symbolics import Byref, Macro, FieldFromPointer, VOID
+from devito.types import Symbol, Scalar, Symbol
 from devito.types.basic import DataSymbol
 from devito.tools import frozendict
 from devito.petsc.types import (PetscMPIInt, PetscErrorCode, MultipleFieldData,
                                 PointerIS, Mat, CallbackVec, Vec, CallbackMat, SNES,
                                 DummyArg, PetscInt, PointerDM, PointerMat, MatReuse,
                                 CallbackPointerIS, CallbackPointerDM, JacobianStruct,
-                                SubMatrixStruct, Initialize, Finalize, ArgvSymbol)
+                                SubMatrixStruct, Initialize, Finalize, ArgvSymbol,
+                                AllocateMemory, VoidPtrPtr, SizeT)
 from devito.petsc.types.macros import petsc_func_begin_user
 from devito.petsc.iet.nodes import PetscMetaData
 from devito.petsc.utils import core_metadata, petsc_languages
@@ -47,6 +48,9 @@ def lower_petsc(iet, **kwargs):
 
     if any(filter(lambda i: isinstance(i.expr.rhs, Finalize), data)):
         return finalize(iet), core_metadata()
+
+    if any(filter(lambda i: isinstance(i.expr.rhs, AllocateMemory), data)):
+        return allocate_memory(iet), metadata
 
     unique_grids = {i.expr.rhs.grid for (i,) in injectsolve_mapper.values()}
     # Assumption is that all solves are on the same grid
@@ -106,6 +110,24 @@ def finalize(iet):
         retstmt=(Call('PetscFunctionReturn', arguments=[0]),)
     )
     return iet._rebuild(body=finalize_body)
+
+
+def allocate_memory(iet):
+    """
+    Allocate memory for PETSc objects.
+    https://petsc.org/release/manualpages/Sys/PetscMalloc/
+    """
+    # Number of bytes to allocate
+    m = SizeT(name="m")
+    # Memory allocated
+    result = VoidPtrPtr(name='result')
+    
+    allocate_body = petsc_call('PetscMalloc', [m, result])
+    allocate_body = CallableBody(
+        body=(petsc_func_begin_user, allocate_body),
+        retstmt=(Call('PetscFunctionReturn', arguments=[0]),)
+    )
+    return iet._rebuild(body=allocate_body, parameters=[m, result])
 
 
 def make_core_petsc_calls(objs, **kwargs):

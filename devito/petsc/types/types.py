@@ -25,6 +25,10 @@ class Finalize(MetaData):
     pass
 
 
+class AllocateMemory(MetaData):
+    pass
+
+
 class LinearSolveExpr(MetaData):
     """
     A symbolic expression passed through the Operator, containing the metadata
