@@ -9,7 +9,7 @@ from devito.ir.iet import (Call, ElementalFunction,
                            FindNodes, retrieve_iteration_tree)
 from devito.types import Constant, LocalCompositeObject
 from devito.passes.iet.languages.C import CDataManager
-from devito.petsc.types import (DM, Mat, LocalVec, PetscMPIInt, KSP,
+from devito.petsc.types import (DM, Mat, Vec, PetscMPIInt, KSP,
                                 PC, KSPConvergedReason, PETScArray,
                                 LinearSolveExpr, FieldData, MultipleFieldData)
 from devito.petsc.solve import PETScSolve, separate_eqn, centre_stencil
@@ -33,7 +33,7 @@ def test_petsc_local_object():
     """
     lo0 = DM('da', stencil_width=1)
     lo1 = Mat('A')
-    lo2 = LocalVec('x')
+    lo2 = Vec('x')
     lo3 = PetscMPIInt('size')
     lo4 = KSP('ksp')
     lo5 = PC('pc')

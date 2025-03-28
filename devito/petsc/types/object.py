@@ -1,4 +1,4 @@
-from ctypes import POINTER, c_char
+from ctypes import POINTER, c_char, c_size_t, c_void_p
 from devito.tools import CustomDtype, dtype_to_ctype, as_tuple, CustomIntType
 from devito.types import (LocalObject, LocalCompositeObject, ModuloDimension,
                           TimeDimension, ArrayObject, CustomDimension)
@@ -66,28 +66,14 @@ class Mat(LocalObject):
         return 2
 
 
-class LocalVec(LocalObject):
+class CallbackVec(LocalObject):
     """
-    PETSc local vector object (Vec).
-    A local vector has ghost locations that contain values that are
-    owned by other MPI ranks.
+    PETSc vector object (Vec).
     """
     dtype = CustomDtype('Vec')
 
 
-class CallbackGlobalVec(LocalVec):
-    """
-    PETSc global vector object (Vec). For example, used for coupled
-    solves inside the `WholeFormFunc` callback.
-    """
-
-
-class GlobalVec(LocalVec):
-    """
-    PETSc global vector object (Vec).
-    A global vector is a parallel vector that has no duplicate values
-    between MPI ranks. A global vector has no ghost locations.
-    """
+class Vec(CallbackVec):
     @property
     def _C_free(self):
         return petsc_call('VecDestroy', [Byref(self.function)])
@@ -322,3 +308,16 @@ class ArgvSymbol(DataSymbol):
     @property
     def _C_ctype(self):
         return POINTER(POINTER(c_char))
+
+
+class VoidPtrPtr(DataSymbol):
+    @property
+    def _C_ctype(self):
+        return (POINTER(c_void_p))
+
+
+class SizeT(DataSymbol):
+    @property
+    def _C_ctype(self):
+        # return CustomDtype('size_t')
+        return c_size_t
