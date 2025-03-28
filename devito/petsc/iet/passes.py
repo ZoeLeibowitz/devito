@@ -41,17 +41,16 @@ def lower_petsc(iet, **kwargs):
             f"{petsc_languages}, but got '{kwargs['language']}'"
         )
 
-    metadata = core_metadata()
     data = FindNodes(PetscMetaData).visit(iet)
 
     if any(filter(lambda i: isinstance(i.expr.rhs, Initialize), data)):
-        return initialize(iet), metadata
+        return initialize(iet), core_metadata()
 
     if any(filter(lambda i: isinstance(i.expr.rhs, Finalize), data)):
-        return finalize(iet), metadata
+        return finalize(iet), core_metadata()
 
     if any(filter(lambda i: isinstance(i.expr.rhs, AllocateMemory), data)):
-        return allocate_memory(iet), metadata
+        return allocate_memory(iet), core_metadata()
 
     unique_grids = {i.expr.rhs.grid for (i,) in injectsolve_mapper.values()}
     # Assumption is that all solves are on the same grid
@@ -83,7 +82,7 @@ def lower_petsc(iet, **kwargs):
     body = core + tuple(setup) + (BlankLine,) + iet.body.body
     body = iet.body._rebuild(body=body)
     iet = iet._rebuild(body=body)
-    metadata.update({'efuncs': tuple(efuncs.values())})
+    metadata = {**core_metadata(), 'efuncs': tuple(efuncs.values())}
     return iet, metadata
 
 
@@ -115,7 +114,7 @@ def finalize(iet):
 
 def allocate_memory(iet):
     """
-    Allocate memory for PETSc objects.
+    Create function to allocate memory using PetscMalloc.
     https://petsc.org/release/manualpages/Sys/PetscMalloc/
     """
     # Number of bytes to allocate
