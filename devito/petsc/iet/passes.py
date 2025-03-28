@@ -50,7 +50,7 @@ def lower_petsc(iet, **kwargs):
         return finalize(iet), core_metadata()
 
     if any(filter(lambda i: isinstance(i.expr.rhs, AllocateMemory), data)):
-        return allocate_memory(iet), metadata
+        return allocate_memory(iet), core_metadata()
 
     unique_grids = {i.expr.rhs.grid for (i,) in injectsolve_mapper.values()}
     # Assumption is that all solves are on the same grid
@@ -114,7 +114,7 @@ def finalize(iet):
 
 def allocate_memory(iet):
     """
-    Allocate memory for PETSc objects.
+    Create function to allocate memory using PetscMalloc.
     https://petsc.org/release/manualpages/Sys/PetscMalloc/
     """
     # Number of bytes to allocate
