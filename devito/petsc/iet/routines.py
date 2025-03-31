@@ -1368,18 +1368,6 @@ class Solver:
         )
         return List(body=run_solver_calls)
 
-    # @cached_property
-    # def spatial_body(self):
-    #     spatial_body = []
-    #     # TODO: remove the iters[0]
-    #     for tree in retrieve_iteration_tree(self.iters[0]):
-    #         from IPython import embed; embed()
-    #         root = filter_iterations(tree, key=lambda i: i.dim.is_Space)[0]
-    #         if self.injectsolve in FindNodes(PetscMetaData).visit(root):
-    #             spatial_body.append(root)
-    #     spatial_body, = spatial_body
-    #     return spatial_body
-
     @cached_property
     def spatial_body(self):
         spatial_body = []
@@ -1387,7 +1375,6 @@ class Solver:
         for tree in retrieve_iteration_tree(self.iters[0]):
             root = filter_iterations(tree, key=lambda i: i.dim.is_Space)
             if root:
-                # from IPython import embed; embed()
                 root = root[0]
                 if self.injectsolve in FindNodes(PetscMetaData).visit(root):
                     spatial_body.append(root)

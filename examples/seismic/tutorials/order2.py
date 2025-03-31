@@ -9,8 +9,6 @@ from devito.petsc.initialize import PetscInitialize
 configuration['compiler'] = 'custom'
 os.environ['CC'] = 'mpicc'
 
-from sympy import init_printing, latex
-init_printing(use_latex='mathjax')
 
 PetscInitialize()
 
@@ -44,7 +42,7 @@ v_z = TimeFunction(name='v_z', grid=grid, staggered=(z,), space_order=2, time_or
 
 
 p = TimeFunction(name='p', grid=grid, staggered=NODE, space_order=2, time_order=1)
-v = VectorTimeFunction(name='v', grid=grid, space_order=4, time_order=1)
+v = VectorTimeFunction(name='v', grid=grid, space_order=2, time_order=1)
 
 t = grid.stepping_dim
 time = grid.time_dim
@@ -77,14 +75,14 @@ eqn_petsc = Eq(v_x.dt, ro * p.dx)
 petsc1 = PETScSolve(eqn_petsc, target=v_x.forward)
 petsc2 = PETScSolve(Eq(v_z.dt, ro * p.dz), target=v_z.forward)
 # DOUBLE CHECK DIV DOESN'T USE A DIFFERENT DISCRETISATION
-petsc3 = PETScSolve(Eq(p.dt, l2m * (v_x.forward.dx + v_z.forward.dz)), target=p.forward, solver_parameters={'ksp_rtol': 1e-5})
+petsc3 = PETScSolve(Eq(p.dt, l2m * (v_x.forward.dx + v_z.forward.dz)), target=p.forward, solver_parameters={'ksp_rtol': 1e-7})
 
 # from IPython import embed; embed()
 
 
-# with switchconfig(language='petsc'):
-op_2 = Operator(petsc1 + petsc2 + petsc3 + src_p, opt='noop')
-op_2(time=src.time_range.num-1, dt=dt)
+with switchconfig(language='petsc'):
+    op_2 = Operator(petsc1 + petsc2 + petsc3 + src_p, opt='noop')
+    op_2(time=src.time_range.num-1, dt=dt)
 
 
 
@@ -93,6 +91,6 @@ op_2(time=src.time_range.num-1, dt=dt)
 
 print(op_2.ccode)
 norm_p = norm(p)
-print(p.data[:])
+# print(p.data[:])
 assert np.isclose(norm_p, .35098, atol=1e-4, rtol=0)
 print(norm_p)
