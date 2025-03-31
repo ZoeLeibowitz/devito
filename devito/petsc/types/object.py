@@ -319,5 +319,4 @@ class VoidPtrPtr(DataSymbol):
 class SizeT(DataSymbol):
     @property
     def _C_ctype(self):
-        # return CustomDtype('size_t')
         return c_size_t
