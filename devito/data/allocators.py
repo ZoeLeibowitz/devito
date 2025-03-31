@@ -12,7 +12,6 @@ from devito.logger import logger
 from devito.parameters import configuration
 from devito.tools import is_integer, infer_datasize
 
-
 __all__ = ['ALLOC_ALIGNED', 'ALLOC_NUMA_LOCAL', 'ALLOC_NUMA_ANY',
            'ALLOC_KNL_MCDRAM', 'ALLOC_KNL_DRAM', 'ALLOC_GUARD',
            'ALLOC_PETSC', 'default_allocator']
@@ -104,7 +103,6 @@ class MemoryAllocator(AbstractMemoryAllocator):
         size = datasize + padleft + padright
 
         padleft_pointer, memfree_args = self._alloc_C_libcall(size, ctype)
-
         if padleft_pointer is None:
             raise RuntimeError("Unable to allocate %d elements in memory" % size)
 

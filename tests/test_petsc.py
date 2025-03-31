@@ -835,8 +835,6 @@ class TestCoupledLinear:
         enorm2 = norm(e)
         gnorm2 = norm(g)
 
-        print('enorm1:', enorm1)
-        print('enorm2:', enorm2)
         assert np.isclose(enorm1, enorm2, rtol=1e-16)
         assert np.isclose(gnorm1, gnorm2, rtol=1e-16)
 
