@@ -150,9 +150,9 @@ class Differentiable(sympy.Expr, Evaluable):
         return sorted(coefficients, key=key, reverse=True)[0]
 
     def _eval_at(self, func):
-        # if not func.is_Staggered:
-        #     # Cartesian grid, do no waste time
-        #     return self
+        if not func.is_Staggered:
+            # Cartesian grid, do no waste time
+            return self
         return self.func(*[getattr(a, '_eval_at', lambda x: a)(func) for a in self.args])
 
     def _subs(self, old, new, **hints):

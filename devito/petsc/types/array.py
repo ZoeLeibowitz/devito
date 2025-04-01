@@ -94,6 +94,10 @@ class PETScArray(ArrayBasic, Differentiable):
         return self.target.space_order
 
     @property
+    def is_Staggered(self):
+        return self.target.staggered is not None
+
+    @property
     def localinfo(self):
         return self._localinfo
 
