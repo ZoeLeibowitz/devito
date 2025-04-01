@@ -9,7 +9,7 @@ os.environ['CC'] = 'mpicc'
 
 
 # PETSc implementation of devito/examples/seismic/tutorials/05_staggered_acoustic.ipynb
-# to test staggered grid implementation with PETSc
+# Test staggered grid implementation with PETSc
 
 PetscInitialize()
 
@@ -34,8 +34,8 @@ src = DGaussSource(name='src', grid=grid, f0=0.01, time_range=time_range, a=0.00
 src.coordinates.data[:] = [1000., 1000.]
 
 # Now we create the velocity and pressure fields
-# NOTE/TODO: PETSc does not yet fully support VectorTimeFunction's yet. Ideally,
-# should hook it up with new "coupled" machinery
+# NOTE/TODO: PETSc does not yet fully support VectorTimeFunctions. Ideally,
+# it should use the new "coupled" machinery
 p2 = TimeFunction(name='p2', grid=grid, staggered=NODE, space_order=2, time_order=1)
 vx2 = TimeFunction(name='vx2', grid=grid, staggered=(x,), space_order=2, time_order=1)
 vz2 = TimeFunction(name='vz2', grid=grid, staggered=(z,), space_order=2, time_order=1)
@@ -60,9 +60,9 @@ v_z_2 = Eq(vz2.dt, ro * p2.dz)
 petsc_v_x_2 = PETScSolve(v_x_2, target=vx2.forward)
 petsc_v_z_2 = PETScSolve(v_z_2, target=vz2.forward)
 
-petsc_p_2 = PETScSolve(Eq(p2.dt, l2m * (vx2.forward.dx + vz2.forward.dz)),
-                       target=p2.forward,
-                       solver_parameters={'ksp_rtol': 1e-7})
+p_2 = Eq(p2.dt, l2m * (vx2.forward.dx + vz2.forward.dz))
+
+petsc_p_2 = PETScSolve(p_2, target=p2.forward, solver_parameters={'ksp_rtol': 1e-7})
 
 with switchconfig(language='petsc'):
     op_2 = Operator(petsc_v_x_2 + petsc_v_z_2 + petsc_p_2 + src_p_2, opt='noop')
@@ -85,9 +85,9 @@ v_z_4 = Eq(vz4.dt, ro * p4.dz)
 petsc_v_x_4 = PETScSolve(v_x_4, target=vx4.forward)
 petsc_v_z_4 = PETScSolve(v_z_4, target=vz4.forward)
 
-petsc_p_4 = PETScSolve(Eq(p4.dt, l2m * (vx4.forward.dx + vz4.forward.dz)),
-                       target=p4.forward,
-                       solver_parameters={'ksp_rtol': 1e-7})
+p_4 = Eq(p4.dt, l2m * (vx4.forward.dx + vz4.forward.dz))
+
+petsc_p_4 = PETScSolve(p_4, target=p4.forward, solver_parameters={'ksp_rtol': 1e-7})
 
 with switchconfig(language='petsc'):
     op_4 = Operator(petsc_v_x_4 + petsc_v_z_4 + petsc_p_4 + src_p_4, opt='noop')
