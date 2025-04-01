@@ -1,24 +1,28 @@
 from devito import *
 import os
-from examples.seismic.source import DGaussSource, TimeAxis
-from examples.seismic import plot_image
 import numpy as np
-from devito.finite_differences.operators import div, grad
+from examples.seismic.source import DGaussSource, TimeAxis
 from devito.petsc import PETScSolve
 from devito.petsc.initialize import PetscInitialize
 configuration['compiler'] = 'custom'
 os.environ['CC'] = 'mpicc'
 
 
-# PETSc implementation of devito/examples/seismic/tutorials/05_staggered_acoustic.ipynb 
-# to test staggered grid implementation with PETSc
+# PETSc implementation of devito/examples/seismic/tutorials/05_staggered_acoustic.ipynb
+# to test staggered grid implementation with PETSc
 
 PetscInitialize()
 
 extent = (2000., 2000.)
 shape = (81, 81)
-x = SpaceDimension(name='x', spacing=Constant(name='h_x', value=extent[0]/(shape[0]-1), dtype=np.float64))
-z = SpaceDimension(name='z', spacing=Constant(name='h_z', value=extent[1]/(shape[1]-1), dtype=np.float64))
+
+x = SpaceDimension(
+    name='x', spacing=Constant(name='h_x', value=extent[0]/(shape[0]-1), dtype=np.float64)
+)
+z = SpaceDimension(
+    name='z', spacing=Constant(name='h_z', value=extent[1]/(shape[1]-1), dtype=np.float64)
+)
+
 grid = Grid(extent=extent, shape=shape, dimensions=(x, z), dtype=np.float64)
 
 # Timestep size
@@ -30,8 +34,8 @@ src = DGaussSource(name='src', grid=grid, f0=0.01, time_range=time_range, a=0.00
 src.coordinates.data[:] = [1000., 1000.]
 
 # Now we create the velocity and pressure fields
-# NOTE/TODO: PETSc doesn't fully support VectorTimeFunction's yet, since it makes
-# sense to hook this up with the "coupled" interface
+# NOTE/TODO: PETSc does not yet fully support VectorTimeFunction's yet. Ideally,
+# should hook it up with new "coupled" machinery
 p2 = TimeFunction(name='p2', grid=grid, staggered=NODE, space_order=2, time_order=1)
 vx2 = TimeFunction(name='vx2', grid=grid, staggered=(x,), space_order=2, time_order=1)
 vz2 = TimeFunction(name='vz2', grid=grid, staggered=(z,), space_order=2, time_order=1)
@@ -68,7 +72,6 @@ norm_p2 = norm(p2)
 assert np.isclose(norm_p2, .35098, atol=1e-4, rtol=0)
 
 
-##### space order 4 #####
 # 4th order acoustic according to fdelmoc
 p4 = TimeFunction(name='p4', grid=grid, staggered=NODE, space_order=4)
 vx4 = TimeFunction(name='vx4', grid=grid, staggered=(x,), space_order=4, time_order=1)
