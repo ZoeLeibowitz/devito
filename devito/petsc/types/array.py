@@ -27,9 +27,6 @@ class PETScArray(ArrayBasic, Differentiable):
 
     _data_alignment = False
 
-    # Default method for the finite difference approximation weights computation.
-    _default_fd = 'taylor'
-
     __rkwargs__ = (AbstractFunction.__rkwargs__ +
                    ('target', 'liveness', 'coefficients', 'localinfo'))
 
@@ -38,15 +35,8 @@ class PETScArray(ArrayBasic, Differentiable):
         self._target = kwargs.get('target')
         self._ndim = kwargs['ndim'] = len(self._target.space_dimensions)
         self._dimensions = kwargs['dimensions'] = self._target.space_dimensions
-
         super().__init_finalize__(*args, **kwargs)
-
-        # Symbolic (finite difference) coefficients
-        self._coefficients = kwargs.get('coefficients', self._default_fd)
-        if self._coefficients not in fd_weights_registry:
-            raise ValueError("coefficients must be one of %s"
-                             " not %s" % (str(fd_weights_registry), self._coefficients))
-
+        self._coefficients = self._target.coefficients
         self._localinfo = kwargs.get('localinfo', None)
 
     @property
@@ -60,8 +50,12 @@ class PETScArray(ArrayBasic, Differentiable):
     @classmethod
     def __indices_setup__(cls, *args, **kwargs):
         target = kwargs['target']
-        indices = tuple(target.indices[d] for d in target.space_dimensions)
-        return as_tuple(indices), as_tuple(indices)
+        dimensions = tuple(target.indices[d] for d in target.space_dimensions)
+        if args:
+            indices = args
+        else:
+            indices = dimensions
+        return as_tuple(dimensions), as_tuple(indices)
 
     def __halo_setup__(self, **kwargs):
         target = kwargs['target']
