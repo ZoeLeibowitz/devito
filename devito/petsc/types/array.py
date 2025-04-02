@@ -60,12 +60,8 @@ class PETScArray(ArrayBasic, Differentiable):
     @classmethod
     def __indices_setup__(cls, *args, **kwargs):
         target = kwargs['target']
-        dimensions = tuple(target.indices[d] for d in target.space_dimensions)
-        if args:
-            indices = args
-        else:
-            indices = dimensions
-        return as_tuple(dimensions), as_tuple(indices)
+        indices = tuple(target.indices[d] for d in target.space_dimensions)
+        return as_tuple(indices), as_tuple(indices)
 
     def __halo_setup__(self, **kwargs):
         target = kwargs['target']
@@ -94,6 +90,10 @@ class PETScArray(ArrayBasic, Differentiable):
         return self.target.space_order
 
     @property
+    def staggered(self):
+        return self.target.staggered
+
+    @property
     def is_Staggered(self):
         return self.target.staggered is not None
 
@@ -112,6 +112,10 @@ class PETScArray(ArrayBasic, Differentiable):
     @cached_property
     def _C_ctype(self):
         return POINTER(dtype_to_ctype(self.dtype))
+
+    @cached_property
+    def _fd_priority(self):
+        return self.target._fd_priority
 
     @property
     def symbolic_shape(self):
