@@ -76,7 +76,6 @@ class InjectSolve:
         b, F_target, targets = separate_eqn(eq, target)
         formfunc = self.make_formfunc(eq, F_target, arrays, targets)
         formrhs = self.make_rhs(eq, b, arrays)
-
         return (formfunc, formrhs)
 
     def build_matvec_eqns(self, eq, target, arrays):

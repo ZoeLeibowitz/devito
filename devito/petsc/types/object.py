@@ -1,4 +1,4 @@
-from ctypes import POINTER, c_char
+from ctypes import POINTER, c_char, c_size_t, c_void_p
 from devito.tools import CustomDtype, dtype_to_ctype, as_tuple, CustomIntType
 from devito.types import (LocalObject, LocalCompositeObject, ModuloDimension,
                           TimeDimension, ArrayObject, CustomDimension)
@@ -308,3 +308,15 @@ class ArgvSymbol(DataSymbol):
     @property
     def _C_ctype(self):
         return POINTER(POINTER(c_char))
+
+
+class VoidPtrPtr(DataSymbol):
+    @property
+    def _C_ctype(self):
+        return (POINTER(c_void_p))
+
+
+class SizeT(DataSymbol):
+    @property
+    def _C_ctype(self):
+        return c_size_t
