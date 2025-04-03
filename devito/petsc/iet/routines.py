@@ -1442,7 +1442,7 @@ class Solver:
 
         rhs_call = petsc_call(rhs_callback.name, [sobjs['dmda'], sobjs['bglobal']])
 
-        vec_replace_array = self.timedep.replace_array(target)
+        vec_place_array = self.timedep.place_array(target)
 
         if self.cbbuilder.initialguesses:
             initguess = self.cbbuilder.initialguesses[0]
@@ -1467,7 +1467,7 @@ class Solver:
 
         run_solver_calls = (struct_assignment,) + (
             rhs_call,
-        ) + vec_replace_array + (
+        ) + vec_place_array + (
             initguess_call,
             dm_local_to_global_x,
             snes_solve,
@@ -1524,7 +1524,7 @@ class CoupledSolver(Solver):
             pre_solve += (
                 petsc_call(c.name, [dm, target_bglob]),
                 petsc_call('DMCreateLocalVector', [dm, Byref(target_xloc)]),
-                self.timedep.replace_array(t),
+                self.timedep.place_array(t),
                 petsc_call(
                     'DMLocalToGlobal',
                     [dm, target_xloc, insert_vals, target_xglob]
@@ -1594,23 +1594,7 @@ class NonTimeDependent:
     def uxreplace_time(self, body):
         return body
 
-    def replace_array(self, target):
-        """
-        VecReplaceArray() is a PETSc function that allows replacing the array
-        of a `Vec` with a user provided array.
-        https://petsc.org/release/manualpages/Vec/VecReplaceArray/
-
-        This function is used to replace the array of the PETSc solution `Vec`
-        with the array from the `Function` object representing the target.
-
-        Examples
-        --------
-        >>> target
-        f1(x, y)
-        >>> call = replace_array(target)
-        >>> print(call)
-        PetscCall(VecReplaceArray(xlocal0,f1_vec->data));
-        """
+    def place_array(self, target):
         sobjs = self.sobjs
 
         field_from_ptr = FieldFromPointer(
@@ -1717,29 +1701,27 @@ class TimeDependent(NonTimeDependent):
                     mapper[d] = d
         return mapper
 
-    def replace_array(self, target):
+    def place_array(self, target):
         """
         In the case that the actual target is time-dependent e.g a `TimeFunction`,
         a pointer to the first element in the array that will be updated during
-        the time step is passed to VecReplaceArray().
+        the time step is passed to VecPlaceArray().
 
         Examples
         --------
         >>> target
         f1(time + dt, x, y)
-        >>> calls = replace_array(target)
+        >>> calls = place_array(target)
         >>> print(List(body=calls))
-        PetscCall(VecGetSize(xlocal0,&(localsize0)));
         float * f1_ptr0 = (time + 1)*localsize0 + (float*)(f1_vec->data);
-        PetscCall(VecReplaceArray(xlocal0,f1_ptr0));
+        PetscCall(VecPlaceArray(xlocal0,f1_ptr0));
 
         >>> target
         f1(t + dt, x, y)
-        >>> calls = replace_array(target)
+        >>> calls = place_array(target)
         >>> print(List(body=calls))
-        PetscCall(VecGetSize(xlocal0,&(localsize0)));
         float * f1_ptr0 = t1*localsize0 + (float*)(f1_vec->data);
-        PetscCall(VecReplaceArray(xlocal0,f1_ptr0));
+        PetscCall(VecPlaceArray(xlocal0,f1_ptr0));
         """
         sobjs = self.sobjs
 
@@ -1763,7 +1745,7 @@ class TimeDependent(NonTimeDependent):
                 ),
                 petsc_call('VecPlaceArray', [xlocal, start_ptr])
             )
-        return super().replace_array(target)
+        return super().place_array(target)
 
     def assign_time_iters(self, struct):
         """
