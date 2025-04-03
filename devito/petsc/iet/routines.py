@@ -1,5 +1,6 @@
 from collections import OrderedDict
 from functools import cached_property
+import math
 
 from devito.ir.iet import (Call, FindSymbols, List, Uxreplace, CallableBody,
                            Dereference, DummyExpr, BlankLine, Callable, FindNodes,
@@ -1111,8 +1112,19 @@ class BaseSetup:
         global_x = petsc_call('DMCreateGlobalVector',
                               [dmda, Byref(sobjs['xglobal'])])
 
-        local_x = petsc_call('DMCreateLocalVector',
-                             [dmda, Byref(sobjs['xlocal'])])
+        target = self.fielddata.target
+        field_from_ptr = FieldFromPointer(
+            target.function._C_field_data, target.function._C_symbol
+        )
+
+        local_size = math.prod(
+            v for v, dim in zip(target.shape_allocated, target.dimensions) if dim.is_Space
+        )
+        local_x = petsc_call('VecCreateMPIWithArray',
+                             ['PETSC_COMM_WORLD', 1, local_size, 'PETSC_DECIDE',
+                              field_from_ptr, Byref(sobjs['xlocal'])])
+
+        # TODO: potentially also need to set the DM and local/global map to xlocal
 
         get_local_size = petsc_call('VecGetSize',
                                     [sobjs['xlocal'], Byref(sobjs['localsize'])])
@@ -1247,11 +1259,87 @@ class CoupledSetup(BaseSetup):
     def snes_ctx(self):
         return Byref(self.solver_objs['jacctx'])
 
-    def _extend_setup(self):
+    def _setup(self):
+        # TODO: minimise code duplication with superclass
         objs = self.objs
         sobjs = self.solver_objs
 
         dmda = sobjs['dmda']
+
+        solver_params = self.injectsolve.expr.rhs.solver_parameters
+
+        snes_create = petsc_call('SNESCreate', [objs['comm'], Byref(sobjs['snes'])])
+
+        snes_set_dm = petsc_call('SNESSetDM', [sobjs['snes'], dmda])
+
+        create_matrix = petsc_call('DMCreateMatrix', [dmda, Byref(sobjs['Jac'])])
+
+        # NOTE: Assuming all solves are linear for now
+        snes_set_type = petsc_call('SNESSetType', [sobjs['snes'], 'SNESKSPONLY'])
+
+        snes_set_jac = petsc_call(
+            'SNESSetJacobian', [sobjs['snes'], sobjs['Jac'],
+                                sobjs['Jac'], 'MatMFFDComputeJacobian', objs['Null']]
+        )
+
+        global_x = petsc_call('DMCreateGlobalVector',
+                              [dmda, Byref(sobjs['xglobal'])])
+
+        local_x = petsc_call('DMCreateLocalVector', [dmda, Byref(sobjs['xlocal'])])
+
+        get_local_size = petsc_call('VecGetSize',
+                                    [sobjs['xlocal'], Byref(sobjs['localsize'])])
+
+        global_b = petsc_call('DMCreateGlobalVector',
+                              [dmda, Byref(sobjs['bglobal'])])
+
+        snes_get_ksp = petsc_call('SNESGetKSP',
+                                  [sobjs['snes'], Byref(sobjs['ksp'])])
+
+        ksp_set_tols = petsc_call(
+            'KSPSetTolerances', [sobjs['ksp'], solver_params['ksp_rtol'],
+                                 solver_params['ksp_atol'], solver_params['ksp_divtol'],
+                                 solver_params['ksp_max_it']]
+        )
+
+        ksp_set_type = petsc_call(
+            'KSPSetType', [sobjs['ksp'], solver_mapper[solver_params['ksp_type']]]
+        )
+
+        ksp_get_pc = petsc_call(
+            'KSPGetPC', [sobjs['ksp'], Byref(sobjs['pc'])]
+        )
+
+        # Even though the default will be jacobi, set to PCNONE for now
+        pc_set_type = petsc_call('PCSetType', [sobjs['pc'], 'PCNONE'])
+
+        ksp_set_from_ops = petsc_call('KSPSetFromOptions', [sobjs['ksp']])
+
+        matvec = self.cbbuilder.main_matvec_callback
+        matvec_operation = petsc_call(
+            'MatShellSetOperation',
+            [sobjs['Jac'], 'MATOP_MULT', MatShellSetOp(matvec.name, void, void)]
+        )
+        formfunc = self.cbbuilder.main_formfunc_callback
+        formfunc_operation = petsc_call(
+            'SNESSetFunction',
+            [sobjs['snes'], objs['Null'], FormFunctionCallback(formfunc.name, void, void),
+             self.snes_ctx]
+        )
+
+        dmda_calls = self._create_dmda_calls(dmda)
+
+        mainctx = sobjs['userctx']
+
+        call_struct_callback = petsc_call(
+            self.cbbuilder.user_struct_callback.name, [Byref(mainctx)]
+        )
+
+        # TODO: maybe don't need to explictly set this
+        mat_set_dm = petsc_call('MatSetDM', [sobjs['Jac'], dmda])
+
+        calls_set_app_ctx = petsc_call('DMSetApplicationContext', [dmda, Byref(mainctx)])
+
         create_field_decomp = petsc_call(
             'DMCreateFieldDecomposition',
             [dmda, Byref(sobjs['nfields']), objs['Null'], Byref(sobjs['fields']),
@@ -1297,13 +1385,34 @@ class CoupledSetup(BaseSetup):
             [sobjs[f'da{t.name}'], Byref(sobjs[f'bglobal{t.name}'])]
         ) for t in targets]
 
-        return (
+        coupled_setup = dmda_calls + (
+            snes_create,
+            snes_set_dm,
+            create_matrix,
+            snes_set_jac,
+            snes_set_type,
+            global_x,
+            local_x,
+            get_local_size,
+            global_b,
+            snes_get_ksp,
+            ksp_set_tols,
+            ksp_set_type,
+            ksp_get_pc,
+            pc_set_type,
+            ksp_set_from_ops,
+            matvec_operation,
+            formfunc_operation,
+            call_struct_callback,
+            mat_set_dm,
+            calls_set_app_ctx,
             create_field_decomp,
             matop_create_submats_op,
             call_coupled_struct_callback,
             shell_set_ctx,
-            create_submats
-        ) + tuple(deref_dms) + tuple(xglobals) + tuple(bglobals)
+            create_submats) + \
+            tuple(deref_dms) + tuple(xglobals) + tuple(bglobals)
+        return coupled_setup
 
 
 class Solver:
